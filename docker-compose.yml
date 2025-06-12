@@ -105,8 +105,11 @@ services:
       - ./flink/jobs:/opt/flink/jobs
     entrypoint: ["tail", "-f", "/dev/null"]
     environment:
-      - FLINK_JOBMANAGER_HOST=jobmanager
-      - FLINK_JOBMANAGER_PORT=6123
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        rest.address: jobmanager
+        rest.port: 8081
     networks:
       - sabd-stream-processing-network
 
