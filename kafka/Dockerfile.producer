@@ -1,0 +1,12 @@
+FROM python:3.10-slim
+
+# Install build dependencies for confluent-kafka
+RUN apt-get update && apt-get install -y gcc librdkafka-dev
+
+# Install python packages
+RUN pip install --no-cache-dir confluent-kafka requests msgpack
+
+# Copy producer script
+COPY kafka/producer.py /app/producer.py
+
+WORKDIR /app

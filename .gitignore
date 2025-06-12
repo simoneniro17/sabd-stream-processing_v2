@@ -1,0 +1,10 @@
+# Maven
+target/
+
+# IDE
+.venv
+__pycache__
+.vscode
+
+# DEBS
+gc25-chall
