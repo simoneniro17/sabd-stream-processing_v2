@@ -147,6 +147,30 @@ under the License.
 					</execution>
 				</executions>
 				</plugin>
+
+			   <!-- Plugin usato per  copiare il jar nella cartella jobs -->
+				<plugin>
+    				<groupId>org.apache.maven.plugins</groupId>
+    				<artifactId>maven-antrun-plugin</artifactId>
+    				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<copy file="${project.build.directory}/${project.build.finalName}.jar" 
+									tofile="${project.basedir}/jobs/${project.build.finalName}.jar" 
+									overwrite="true"/>
+								<echo message="JAR copied to jobs folder: ${project.build.finalName}.jar"/>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
 		</plugins>
 
 	</build>

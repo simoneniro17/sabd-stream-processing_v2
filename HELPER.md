@@ -8,7 +8,7 @@ cd flink
 mvn clean package
 ```
 
-Il comando precedente crea il JAR, che per il momento va spostato manualmente (flink-1.0-SNAPSHOT.jar) nella cartella jobs.
+Il comando precedente crea il JAR (flink-1.0-SNAPSHOT.jar), che viene copiato automaticamente nella cartella jobs.
 
 Per lanciare il job da dentro il container:
 ```bash
