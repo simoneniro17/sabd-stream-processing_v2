@@ -64,10 +64,14 @@ public class StreamingJob {
         saturationResultStream.print("Query 1 - Saturation");
 
         // === Query 2 ===
+
+        //in .process se si vuole usare la classe che permette di vedere lo scorrimento delle finestre passare DummyWindowFunction
+        // oppure OutlierDetection per rilevare gli outlier
+
         DataStream<String> windowedStream = tileLayerStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
-            .process(new DummyWindowFunction());
+            .process(new OutlierDetection());
 
         // Output Query 2
         windowedStream.print("Query 2 - Window");
@@ -80,3 +84,9 @@ public class StreamingJob {
 
 //TODO: La map() esegue l’intera logica per ciascuna immagine, subito dopo averla ricevuta e decodificata. questo non so se è l'approccio effettivamente corretto. 
 //Bisogna, ad esempio, creare prima il dtastream e far si che query1 processi tutto il datastream? 
+
+
+// - creo un'unica sorgente kafkaStream
+// - faccio una sola map (KafkaMapFunction) che decodifica e prepara il TileLayerData
+// - poi applico la Query 1 (saturazione) e la Query 2 (outlier detection) su questo stream già elaborato.
+// Così evito di leggere due volte da Kafka 
