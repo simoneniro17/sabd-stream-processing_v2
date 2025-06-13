@@ -31,8 +31,11 @@ public class StreamingJob {
             .setValueOnlyDeserializer(new MsgPackDeserializationSchema())
             .build();
 
-        DataStream<String> result = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source")
-        .map(new MapFunction<Map<String, Object>, String>() {
+        // === UNA SOLA sorgente Kafka ===
+        DataStream<Map<String, Object>> kafkaStream = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
+
+         // === Stream per la Query 1 ===
+        DataStream<String> result = kafkaStream.map(new MapFunction<Map<String, Object>, String>() {
         @Override
         // Utilizziamo una map function personalizzata
         public String map(Map<String, Object> record) throws Exception {
@@ -42,7 +45,6 @@ public class StreamingJob {
                 Object printIdObj = record.get("print_id");
                 Object tileIdObj = record.get("tile_id");
                 Object raw = record.get("tif");
-
                 // Controlliamo che i campi non siano nulli
                 if (batchIdObj == null || printIdObj == null || tileIdObj == null || raw == null) {
                     throw new RuntimeException("Uno o più campi sono nulli: " + record);
@@ -91,9 +93,22 @@ public class StreamingJob {
             }
         }
     });
-        result.print();
+        result.print("Query 1 Result: ");
 
-        env.execute("Kafka MsgPack + TIFF Decoder");
+    // === Stream per la Query 2 ===
+        DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new KafkaRecordToTileMapFunction());
+
+        DataStream<String> windowedStream = tileLayerStream
+            .keyBy(tile -> tile.printId + "_" + tile.tileId)
+            .countWindow(3, 1)
+            .process(new DummyWindowFunction());
+
+        // Output Query 2
+        windowedStream.print("Query 2 - Window");
+
+        // === SINGLE EXECUTE ===
+        env.execute("StreamingJob - Query 1 + Query 2");
+    
     }}
 
 //TODO: La map() esegue l’intera logica per ciascuna immagine, subito dopo averla ricevuta e decodificata. questo non so se è l'approccio effettivamente corretto. 
