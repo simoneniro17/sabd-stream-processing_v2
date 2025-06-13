@@ -31,73 +31,39 @@ public class StreamingJob {
             .setValueOnlyDeserializer(new MsgPackDeserializationSchema())
             .build();
 
-        // === UNA SOLA sorgente Kafka ===
+          // === UNA SOLA sorgente Kafka ===
         DataStream<Map<String, Object>> kafkaStream = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
 
-         // === Stream per la Query 1 ===
-        DataStream<String> result = kafkaStream.map(new MapFunction<Map<String, Object>, String>() {
-        @Override
-        // Utilizziamo una map function personalizzata
-        public String map(Map<String, Object> record) throws Exception {
-            try {
-                // Prendiiamo prima il record e lo scomponiamo in oggetti
-                Object batchIdObj = record.get("batch_id");
-                Object printIdObj = record.get("print_id");
-                Object tileIdObj = record.get("tile_id");
-                Object raw = record.get("tif");
-                // Controlliamo che i campi non siano nulli
-                if (batchIdObj == null || printIdObj == null || tileIdObj == null || raw == null) {
-                    throw new RuntimeException("Uno o più campi sono nulli: " + record);
-                }
+        // === UNA SOLA MAP per decodificare il TIFF ===
+        DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new KafkaMapFunction());
 
-                // traformiamo gli oggetti in stringhe
-                String batchId = batchIdObj.toString();
-                String printId = printIdObj.toString();
-                String tileId = tileIdObj.toString();
+        // === Query 1 ===
+        DataStream<String> saturationResultStream = tileLayerStream.map(new MapFunction<TileLayerData, String>() {
+            @Override
+            public String map(TileLayerData tile) throws Exception {
+                // Ricrea BufferedImage da temperatureMatrix
+                int[][] matrix = tile.temperatureMatrix;
+                int height = matrix.length;
+                int width = matrix[0].length;
 
-                // questa parte serve per processare l'immagine TIFF
-                // prima dobbiamo capire il tipo di raw (questa parte può essere rimossa lasciando solo il tipo effttivo andnado per esclusione
-                // la lascio perché non si sa mai)
-                byte[] tiffBytes;
-                if (raw instanceof byte[]) {
-                    tiffBytes = (byte[]) raw;
-                } else if (raw instanceof ByteBuffer) {
-                    ByteBuffer buf = (ByteBuffer) raw;
-                    tiffBytes = new byte[buf.remaining()];
-                    buf.get(tiffBytes);
-                } else if (raw instanceof String) {
-                    tiffBytes = Base64.getDecoder().decode((String) raw);
-                } else {
-                    throw new RuntimeException("Tipo tif non riconosciuto: " + raw.getClass());
-                }
-
-                // ora che abbiamo i byte dell'immagine, possiamo decodificarla
-                BufferedImage img;
-                try (ByteArrayInputStream bais = new ByteArrayInputStream(tiffBytes)) {
-                    img = ImageIO.read(bais);
-                    if (img == null) {
-                        throw new RuntimeException("Errore decodifica TIFF: immagine nulla");
+                BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_USHORT_GRAY);
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        img.getRaster().setSample(x, y, 0, matrix[y][x]);
                     }
                 }
 
-                // ora che l'immagine è stata decodificata possiamo eseguire query1
-                SaturatedPointCalculation.SaturationResult saturationResult =  
-                        SaturatedPointCalculation.analyzeSaturation(batchId, printId, tileId, img);
+                SaturatedPointCalculation.SaturationResult saturationResult =
+                    SaturatedPointCalculation.analyzeSaturation(tile.batchId, tile.printId, tile.tileId, img);
 
                 return saturationResult.toString();
-
-            } catch (Exception e) {
-                System.err.println("Errore durante il parsing del record: " + e.getMessage());
-                e.printStackTrace();
-                return "Errore nel record";
             }
-        }
-    });
-        result.print("Query 1 Result: ");
+        });
 
-    // === Stream per la Query 2 ===
-        DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new KafkaRecordToTileMapFunction());
+        // Output Query 1
+        saturationResultStream.print("Query 1 - Saturation");
 
+        // === Query 2 ===
         DataStream<String> windowedStream = tileLayerStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
@@ -108,8 +74,9 @@ public class StreamingJob {
 
         // === SINGLE EXECUTE ===
         env.execute("StreamingJob - Query 1 + Query 2");
-    
-    }}
+
+    }
+}
 
 //TODO: La map() esegue l’intera logica per ciascuna immagine, subito dopo averla ricevuta e decodificata. questo non so se è l'approccio effettivamente corretto. 
 //Bisogna, ad esempio, creare prima il dtastream e far si che query1 processi tutto il datastream? 

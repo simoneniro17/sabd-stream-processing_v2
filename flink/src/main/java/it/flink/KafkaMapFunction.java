@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.Map;
 
-public class KafkaRecordToTileMapFunction implements MapFunction<Map<String, Object>, TileLayerData> {
+public class KafkaMapFunction implements MapFunction<Map<String, Object>, TileLayerData> {
 //map uguale a quella implementata in StreamingJob solo che restituisce un TileLayerData invece di una Stringa, secondo me più utile per future elaborazioni
     @Override
     public TileLayerData map(Map<String, Object> record) throws Exception {
