@@ -13,8 +13,12 @@ public class MsgPackDeserializationSchema implements DeserializationSchema<Map<S
 
     private static final ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
 
-    @Override
+    @Override   // Definiamo il metodo per deserializzare i messaggi in Map<String, Object>
     public Map<String, Object> deserialize(byte[] message) throws IOException {
+        if (message == null || message.length == 0) {
+            return null; // Gestione del caso in cui il messaggio sia vuoto
+        }
+        // Utilizziamo l'ObjectMapper per deserializzare il messaggio in una mappa
         return mapper.readValue(message, Map.class);
     }
 

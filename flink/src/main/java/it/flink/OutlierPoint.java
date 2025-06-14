@@ -1,6 +1,5 @@
 package it.flink;
 
-// OutlierPoint.java
 public class OutlierPoint {
     public final int x;
     public final int y;
