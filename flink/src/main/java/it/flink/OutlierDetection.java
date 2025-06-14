@@ -7,7 +7,7 @@ import org.apache.flink.util.Collector;
 import java.util.*;
 public class OutlierDetection extends ProcessWindowFunction<TileLayerData, String, String, GlobalWindow> {
 
-     @Override
+    @Override
     public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<String> out) throws Exception {
         List<TileLayerData> layers = new ArrayList<>();
         for (TileLayerData tile : elements) {
@@ -41,11 +41,16 @@ public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Strin
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
 
+                if (matrix[y][x] == -1) {
+                    // saltiamo i pixel saturati (-1 valore sentinella)
+                    continue;
+                }
+
                 //per ogni punto calcoliamo la media dei visini prossimi e lontani, i prossimi sono quelli 
                 //chhe hanno distanza di manhattan 0,1,2 e i lontani quelli che più lontani 3,4
 
                 double mediaViciniProssimi = calcolaMediaVicini(x, y, layers, 0, 2);
-                double mediaViciniLontani = calcolaMediaVicini(x, y, layers, 3, 4);
+                double mediaViciniLontani = calcolaMediaVicini(x, y, layers, 2, 4);
                 double deviation = Math.abs(mediaViciniProssimi - mediaViciniLontani);
 
                 if (deviation > 6000) {

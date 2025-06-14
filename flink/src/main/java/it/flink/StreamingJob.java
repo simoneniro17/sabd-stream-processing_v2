@@ -5,6 +5,9 @@ import org.apache.flink.api.common.functions.MapFunction;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
+import it.flink.SaturatedPointCalculation.SaturationResult;
+
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 
@@ -38,37 +41,19 @@ public class StreamingJob {
         DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new KafkaMapFunction());
 
         // === Query 1 ===
-        DataStream<String> saturationResultStream = tileLayerStream.map(new MapFunction<TileLayerData, String>() {
-            @Override
-            public String map(TileLayerData tile) throws Exception {
-                // Ricrea BufferedImage da temperatureMatrix
-                int[][] matrix = tile.temperatureMatrix;
-                int height = matrix.length;
-                int width = matrix[0].length;
-
-                BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_USHORT_GRAY);
-                for (int y = 0; y < height; y++) {
-                    for (int x = 0; x < width; x++) {
-                        img.getRaster().setSample(x, y, 0, matrix[y][x]);
-                    }
-                }
-
-                SaturatedPointCalculation.SaturationResult saturationResult =
-                    SaturatedPointCalculation.analyzeSaturation(tile.batchId, tile.printId, tile.tileId, img);
-
-                return saturationResult.toString();
-            }
+        DataStream<TileLayerData> filteredStream = tileLayerStream.map(tile -> {
+            SaturatedPointCalculation.analyzeSaturation(tile);
+            return tile;
         });
+        // TODO: questa operazione è stateless quindi può essere parallelizzata semplicemente. Parallelizziamo su 16 tile con una KeyedProcessFunction
 
-        // Output Query 1
-        saturationResultStream.print("Query 1 - Saturation");
-
+   
         // === Query 2 ===
 
         //in .process se si vuole usare la classe che permette di vedere lo scorrimento delle finestre passare DummyWindowFunction
         // oppure OutlierDetection per rilevare gli outlier
 
-        DataStream<String> windowedStream = tileLayerStream
+        DataStream<String> windowedStream = filteredStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
             .process(new OutlierDetection());
