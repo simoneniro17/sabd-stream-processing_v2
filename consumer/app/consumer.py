@@ -13,7 +13,7 @@ def main():
     broker = args.broker
 
     # === CREA CARTELLA DI OUTPUT SE NON ESISTE ===
-    output_dir = "output"
+    output_dir = "/output"
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"[INFO] Connessione a Kafka su '{broker}' e ascolto del topic '{topic}'...")
@@ -88,6 +88,16 @@ def main():
     print(f"[INFO] Scrittura su: {output_file}")
     with open(output_file, mode='w', newline='') as csvfile:
         writer = csv.writer(csvfile)
+
+        # Aggiunta header in base al topic che stiamo considerando (ovvero in base alla query)
+        if "saturation" in topic:
+            header = ["seq_id", "print_id", "tile_id", "saturated"]
+            writer.writerow(header)
+        else:
+            # ALTRI TOPIC
+            # TODO
+            pass
+
         for row in records:
             writer.writerow(row)
 

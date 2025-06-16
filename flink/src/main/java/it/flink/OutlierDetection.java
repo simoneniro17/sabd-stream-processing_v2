@@ -5,25 +5,29 @@ import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.util.Collector;
 
 import java.util.*;
-public class OutlierDetection extends ProcessWindowFunction<TileLayerData, String, String, GlobalWindow> {
+
+
+public class OutlierDetection extends ProcessWindowFunction<TileLayerData, OutlierOutput, String, GlobalWindow> {
 
     @Override
-    public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<String> out) throws Exception {
+    public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<OutlierOutput> out) throws Exception {
         List<TileLayerData> layers = new ArrayList<>();
         for (TileLayerData tile : elements) {
             layers.add(tile);
         }
         //ordiniamo i layer in base all'id che hanno (0,1,2)
         layers.sort(Comparator.comparingInt(t -> t.layerId));
-            // STAMPA per capire cosa contiene la finestra
+
+        // STAMPA per capire cosa contiene la finestra
         System.out.print("Window [" + key + "] contains layerIds: ");
         for (TileLayerData tile : layers) {
             System.out.print(tile.layerId + " ");
         }
-    System.out.println();
+        System.out.println();
+
         //qui controlliamo che abbiamo alemno 3 layer per poter calcolare gli outlier
         if (layers.size() < 3) {
-            out.collect("Not enough data to detect outliers for key: " + key);
+            System.out.println("Not enough data to detect outliers for key: " + key + ". Required: 3, Found: " + layers.size());
             return;
         }
 
@@ -66,26 +70,34 @@ public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Strin
         // Se ci sono meno di 5 outlier, prenderemo solo quelli disponibili
         List<OutlierPoint> top5 = outliers.subList(0, Math.min(5, outliers.size()));
 
-        // prepara la riga CSV che verra emessa come output
-        StringBuilder sb = new StringBuilder();
-        sb.append(mostRecentLayer.batchId).append(",")
-          .append(mostRecentLayer.printId).append(",")
-          .append(mostRecentLayer.tileId);
-        
+        // Preparazione dei dati CSV per la parte dei punti e deviazioni
+        StringBuilder pointsData = new StringBuilder();
+
         // Inseriamo i top5 punti e le loro deviazioni nel CSV
         int idx = 1;
         for (OutlierPoint p : top5) {
-            sb.append(", P").append(idx).append("=(").append(p.x).append(",").append(p.y).append("), dP").append(idx).append("=").append(String.format("%.2f", p.deviation));
+            if (idx > 1) pointsData.append(", ");
+            pointsData.append("P").append(idx).append("=(").append(p.x).append(",").append(p.y).append("), dP")
+                .append(idx).append("=").append(String.format("%.2f", p.deviation));
             idx++;
         }
 
-        // Se meno di 5 outlier, riempi i campi mancanti
+        // Se meno di 5 outlier, riempiamo i campi mancanti
         while (idx <= 5) {
-            sb.append(", P").append(idx).append("=(), dP").append(idx).append("=");
+            if (idx > 1) pointsData.append(", ");
+            pointsData.append("P").append(idx).append("=(), dP").append(idx).append("=");
             idx++;
         }
 
-        out.collect(sb.toString());
+        // Creiamo l'oggetto di output e lo inviamo al collector
+        OutlierOutput output = new OutlierOutput(
+                mostRecentLayer.batchId,
+                mostRecentLayer.printId,
+                mostRecentLayer.tileId,
+                pointsData.toString()
+        );
+        
+        out.collect(output);
     }
 
 

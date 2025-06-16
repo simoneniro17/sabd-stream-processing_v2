@@ -8,3 +8,6 @@ __pycache__
 
 # DEBS
 gc25-chall
+
+# Output consumer
+consumer/output/

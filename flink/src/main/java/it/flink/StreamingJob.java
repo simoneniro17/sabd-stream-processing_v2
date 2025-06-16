@@ -46,19 +46,25 @@ public class StreamingJob {
             ))
             .returns(SaturationOutput.class);
 
-        KafkaOutputProcessor<SaturationOutput> kafkaOutputProcessor = 
+        KafkaOutputProcessor<SaturationOutput> saturationOutputProcessor = 
             new KafkaOutputProcessor<>("saturation-results-topic", new SaturationOutputSerializationSchema());
 
-        kafkaOutputProcessor.writeToKafka(outputStream);
+        saturationOutputProcessor.writeToKafka(outputStream);
 
         // === Query 2 ===
-        DataStream<String> windowedStream = tileStream
+        DataStream<OutlierOutput> windowedStream = tileStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
             .process(new OutlierDetection());
 
-        // Output Query 2
+        // Output Query 2 (stampa di debug)
         windowedStream.print("Query 2 - Window");
+
+        // Output Query 2 (scrittura su Kafka)
+        KafkaOutputProcessor<OutlierOutput> outlierOutputProcessor =
+            new KafkaOutputProcessor<>("outlier-results-topic", new OutlierOutputSerializationSchema());
+
+        outlierOutputProcessor.writeToKafka(windowedStream);
 
         // Esecuzione del job
         env.execute("StreamingJob - Query 1 + Query 2");
