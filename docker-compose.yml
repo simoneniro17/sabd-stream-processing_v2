@@ -51,6 +51,20 @@ services:
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
 
+  consumer:
+    build:
+      context: .
+      dockerfile: consumer/Dockerfile
+    container_name: consumer
+    depends_on:
+      - kafka
+    volumes:
+      - ./consumer/app:/app
+    command: ["tail", "-f", "/dev/null"]
+    networks:
+      - sabd-stream-processing-network
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
 
   jobmanager:
     image: flink:2.0
