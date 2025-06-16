@@ -31,13 +31,28 @@ public class StreamingJob {
         DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new KafkaMapFunction());
 
         // === Query 1 ===
-        DataStream<TileLayerData> filteredStream = tileLayerStream.map(tile -> {
-            SaturatedPointCalculation.analyzeSaturation(tile);
-            return tile;
-        });
+        DataStream<SaturatedPointCalculation.SaturationResult> saturationResultsStream = tileLayerStream
+            .map(tile -> SaturatedPointCalculation.analyzeSaturation(tile));
+
+        DataStream<TileLayerData> tileStream = saturationResultsStream
+        .map(result -> result.tile);
+
+        DataStream<SaturationOutput> outputStream = saturationResultsStream
+            .map(result -> new SaturationOutput(
+                result.tile.batchId,
+                result.tile.printId,
+                result.tile.tileId,
+                result.saturatedCount
+            ))
+            .returns(SaturationOutput.class);
+
+        KafkaOutputProcessor<SaturationOutput> kafkaOutputProcessor = 
+            new KafkaOutputProcessor<>("saturation-results-topic", new SaturationOutputSerializationSchema());
+
+        kafkaOutputProcessor.writeToKafka(outputStream);
 
         // === Query 2 ===
-        DataStream<String> windowedStream = filteredStream
+        DataStream<String> windowedStream = tileStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
             .process(new OutlierDetection());

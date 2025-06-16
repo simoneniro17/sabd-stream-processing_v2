@@ -2,22 +2,12 @@ package it.flink;
 
 public class SaturatedPointCalculation {
     public static class SaturationResult {
-        public final String batchId;
-        public final String printId;
-        public final String tileId;
+        public final TileLayerData tile;
         public final int saturatedCount;
 
-        public SaturationResult(String batchId, String printId, String tileId, int saturatedCount) {
-            this.batchId = batchId;
-            this.printId = printId;
-            this.tileId = tileId;
+        public SaturationResult(TileLayerData tile, int saturatedCount) {
+            this.tile = tile; 
             this.saturatedCount = saturatedCount;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("batch_id=%s, print_id=%s, tile_id=%s, saturated=%d",
-                    batchId, printId, tileId, saturatedCount);
         }
     }
 
@@ -44,6 +34,6 @@ public class SaturatedPointCalculation {
                     } 
             }
         }
-        return new SaturationResult(tile.batchId, tile.printId, tile.tileId, saturatedCount);
+        return new SaturationResult(tile, saturatedCount);
     }
 }
