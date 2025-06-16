@@ -37,14 +37,15 @@ services:
   producer:
     build:
       context: .
-      dockerfile: kafka/Dockerfile.producer
-    container_name: kafka-producer
+      dockerfile: producer/Dockerfile
+    container_name: producer
     depends_on:
       - kafka
       - gc-challenger
     volumes:
-      - ./kafka/producer.py:/app/producer.py
-    command: ["python", "/app/producer.py"]
+      - ./producer/app:/app
+    command: ["python", "/app/producer.py", "--limit", "360"]
+    #command: ["python", "/app/producer.py"]
     networks:
       - sabd-stream-processing-network
     environment:
