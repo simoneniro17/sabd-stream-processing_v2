@@ -91,7 +91,16 @@ public class StreamingJob {
                 outlier.batchId,
                 outlier.printId,
                 outlier.tileId,
-                outlier.pointsData
+                outlier.p1,
+                outlier.dp1,
+                outlier.p2,
+                outlier.dp2,
+                outlier.p3,
+                outlier.dp3,
+                outlier.p4,
+                outlier.dp4,
+                outlier.p5,
+                outlier.dp5
             ))
             .returns(OutlierOutput.class);
 

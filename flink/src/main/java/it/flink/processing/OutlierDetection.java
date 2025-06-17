@@ -75,32 +75,78 @@ public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Outli
         List<OutlierPoint> top5 = outliers.subList(0, Math.min(5, outliers.size()));
 
         // Preparazione dei dati CSV per la parte dei punti e deviazioni
-        StringBuilder pointsData = new StringBuilder();
+        // StringBuilder pointsData = new StringBuilder();
+        StringBuilder p1 = new StringBuilder();
+        StringBuilder p2 = new StringBuilder();
+        StringBuilder p3 = new StringBuilder();
+        StringBuilder p4 = new StringBuilder();
+        StringBuilder p5 = new StringBuilder();
 
-        // Inseriamo i top5 punti e le loro deviazioni nel CSV
-        int idx = 1;
-        for (OutlierPoint p : top5) {
-            if (idx > 1) pointsData.append(", ");
-            pointsData.append("P").append(idx).append("=(").append(p.x).append(",").append(p.y).append("), dP")
-                .append(idx).append("=").append(String.format("%.2f", p.deviation));
-            idx++;
+        StringBuilder dp1 = new StringBuilder();
+        StringBuilder dp2 = new StringBuilder();
+        StringBuilder dp3 = new StringBuilder();
+        StringBuilder dp4 = new StringBuilder();
+        StringBuilder dp5 = new StringBuilder();
+
+        // Prepara i dati dei top 5 punti
+        for (int i = 0; i < 5; i++) {
+            if (i < top5.size()) {
+                OutlierPoint p = top5.get(i);
+                switch (i) {
+                    case 0:
+                        p1.append("(").append(p.x).append(";").append(p.y).append(")");
+                        dp1.append(String.format("%.2f", p.deviation));
+                        break;
+                    case 1:
+                        p2.append("(").append(p.x).append(";").append(p.y).append(")");
+                        dp2.append(String.format("%.2f", p.deviation));
+                        break;
+                    case 2:
+                        p3.append("(").append(p.x).append(";").append(p.y).append(")");
+                        dp3.append(String.format("%.2f", p.deviation));
+                        break;
+                    case 3:
+                        p4.append("(").append(p.x).append(";").append(p.y).append(")");
+                        dp4.append(String.format("%.2f", p.deviation));
+                        break;
+                    case 4:
+                        p5.append("(").append(p.x).append(";").append(p.y).append(")");
+                        dp5.append(String.format("%.2f", p.deviation));
+                        break;
+                }
+            } else {
+                // Se abbiamo meno di 5 punti, lascia vuoti i restanti
+                switch (i) {
+                    case 0:
+                        p1.append("()");
+                        // p1.append("(null)"); NEL CASO IN CUI VOLESSIMO METTERE DEI VALORI NULLI PER I PUNTI VUOTI
+                        // dp1.append("null"); 
+                        break;
+                    case 1: p2.append("()"); break;
+                    case 2: p3.append("()"); break;
+                    case 3: p4.append("()"); break;
+                    case 4: p5.append("()"); break;
+                }
+            }
         }
 
-        // Se meno di 5 outlier, riempiamo i campi mancanti
-        while (idx <= 5) {
-            if (idx > 1) pointsData.append(", ");
-            pointsData.append("P").append(idx).append("=(), dP").append(idx).append("=");
-            idx++;
-        }
+        Outlier output = new Outlier();
+        output.batchId = mostRecentLayer.batchId;
+        output.printId = mostRecentLayer.printId;
+        output.tileId = mostRecentLayer.tileId;
 
-        // Creiamo l'oggetto di output e lo inviamo al collector
-        Outlier output = new Outlier(
-                mostRecentLayer.batchId,
-                mostRecentLayer.printId,
-                mostRecentLayer.tileId,
-                pointsData.toString(),
-                top5
-        );
+        output.p1 = p1.toString();
+        output.dp1 = dp1.toString();
+        output.p2 = p2.toString();
+        output.dp2 = dp2.toString();
+        output.p3 = p3.toString();
+        output.dp3 = dp3.toString();
+        output.p4 = p4.toString();
+        output.dp4 = dp4.toString();
+        output.p5 = p5.toString();
+        output.dp5 = dp5.toString();
+
+        output.outlierPoints = outliers; // Salviamo la lista di outlier points per il clustering
         
         out.collect(output);
     }

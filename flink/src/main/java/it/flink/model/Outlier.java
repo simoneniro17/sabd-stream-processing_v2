@@ -6,24 +6,30 @@ public class Outlier {
     public String batchId;
     public String printId;
     public String tileId;
-    public String pointsData; // Contiene la parte P1, dP1, P2, dP2 e così via
-    public List<OutlierPoint> outlierPoints; // Lista dei punti, serv poi per il clustering
     
-    public Outlier(String batchId, String printId, String tileId, String pointsData, List<OutlierPoint> outlierPoints) {
-        this.batchId = batchId;
-        this.printId = printId;
-        this.tileId = tileId;
-        this.pointsData = pointsData;
-        this.outlierPoints = outlierPoints;
-    }
+    public String p1;
+    public String dp1;
+    public String p2;
+    public String dp2;
+    public String p3;
+    public String dp3;
+    public String p4;
+    public String dp4;
+    public String p5;
+    public String dp5;
+
+    public List<OutlierPoint> outlierPoints; // Lista dei punti, serv poi per il clustering
 
     // Costruttore vuoto utile per Flink
-    public Outlier() {
-        // Necessario per la serializzazione/deserializzazione
-    }
+    public Outlier() {}
 
     @Override
     public String toString() {
-        return String.format("%s,%s,%s,%s", batchId, printId, tileId, pointsData);
+        return  batchId + "," + printId + "," + tileId + "," +
+               p1 + "," + dp1 + "," +
+               p2 + "," + dp2 + "," +
+               p3 + "," + dp3 + "," +
+               p4 + "," + dp4 + "," +
+               p5 + "," + dp5;
     }
 }
