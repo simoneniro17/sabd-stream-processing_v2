@@ -7,18 +7,17 @@ import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.util.Collector;
 
-import it.flink.model.Outlier;
-import it.flink.model.OutlierOutput;
+import it.flink.model.OutlierResult;
 import it.flink.model.OutlierPoint;
-import it.flink.model.SaturationOutput;
+import it.flink.model.SaturationResult;
 import it.flink.model.TileLayerData;
-import it.flink.processing.OutlierDetection;
-import it.flink.processing.SaturatedPointCalculation;
+import it.flink.processing.Query2;
+import it.flink.processing.Query1;
 import it.flink.serialization.MsgPackDeserializationSchema;
-import it.flink.serialization.OutlierOutputSerializationSchema;
-import it.flink.serialization.SaturationOutputSerializationSchema;
-import it.flink.utils.KafkaMapFunction;
-import it.flink.utils.KafkaOutputProcessor;
+import it.flink.serialization.OutlierResultSerializationSchema;
+import it.flink.serialization.SaturationResultSerializationSchema;
+import it.flink.utils.TileLayerExtractor;
+import it.flink.utils.KafkaResultPublisher;
 
 import java.util.Map;
 
@@ -44,7 +43,7 @@ public class StreamingJob {
         DataStream<Map<String, Object>> kafkaStream = createKafkaSource(env);
 
         // Convertiamo il DataStream originale da Kafka in un DataStream di TileLayerData con la map personalizzata
-        DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new KafkaMapFunction());
+        DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new TileLayerExtractor());
 
         // Esecuzione Query 1
         processQuery1(tileLayerStream);
@@ -73,63 +72,49 @@ public class StreamingJob {
     
     private static void processQuery1(DataStream<TileLayerData> tileLayerStream) {
         // Analisi dei punti
-        DataStream<SaturationOutput> outputStream = tileLayerStream
-            .map(tile -> SaturatedPointCalculation.analyzeSaturation(tile))
-            .map(result -> new SaturationOutput(
+        DataStream<SaturationResult> outputStream = tileLayerStream
+            .map(tile -> Query1.analyzeSaturation(tile))
+            .map(result -> new SaturationResult(
                 result.tile.batchId,
                 result.tile.printId,
                 result.tile.tileId,
                 result.saturatedCount
             ))
-            .returns(SaturationOutput.class);
+            .returns(SaturationResult.class);
 
         // Output su Kafka
-        new KafkaOutputProcessor<>(SATURATION_OUTPUT_TOPIC, new SaturationOutputSerializationSchema())
+        new KafkaResultPublisher<>(SATURATION_OUTPUT_TOPIC, new SaturationResultSerializationSchema())
             .writeToKafka(outputStream);
     }
 
     private static DataStream<TileLayerData> processSaturation(DataStream<TileLayerData> tileLayerStream) {
         return tileLayerStream
-            .map(tile -> SaturatedPointCalculation.analyzeSaturation(tile))
+            .map(tile -> Query1.analyzeSaturation(tile))
             .map(result -> result.tile);
             
     }
 
     private static void processQuery2(DataStream<TileLayerData> tileStream) {
         // Processamento delle finestre scorrevoli
-        DataStream<Outlier> windowedStream = tileStream
+        DataStream<OutlierResult> windowedStream = tileStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
-            .process(new OutlierDetection());
+            .process(new Query2());
 
         // Output Query 2 (stampa di debug)
         windowedStream.print("Query 2 - Window");
 
         // Estrazione punti outlier per l'input per la Query 3
         DataStream<OutlierPoint> outlierPointStream = windowedStream
-            .flatMap((Outlier outlier, Collector<OutlierPoint> out) -> {
+            .flatMap((OutlierResult outlier, Collector<OutlierPoint> out) -> {
                 for (OutlierPoint point : outlier.outlierPoints) {
                     out.collect(point);
                 }
             })
             .returns(OutlierPoint.class);
 
-        // Preparazione output per la Query 2
-        DataStream<OutlierOutput> outlierOutputStream = windowedStream
-            .map(outlier -> new OutlierOutput(
-                outlier.batchId,
-                outlier.printId,
-                outlier.tileId,
-                outlier.p1, outlier.dp1,
-                outlier.p2, outlier.dp2,
-                outlier.p3, outlier.dp3,
-                outlier.p4, outlier.dp4,
-                outlier.p5, outlier.dp5
-            ))
-            .returns(OutlierOutput.class);
-
         // Output Query 2 (scrittura su Kafka)
-        new KafkaOutputProcessor<>(OUTLIER_OUTPUT_TOPIC, new OutlierOutputSerializationSchema())
-            .writeToKafka(outlierOutputStream);
+        new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new OutlierResultSerializationSchema())
+            .writeToKafka(windowedStream);
     }
 }
