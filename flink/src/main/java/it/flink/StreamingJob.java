@@ -5,6 +5,8 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+import org.apache.flink.util.Collector;
+
 
 import java.util.Map;
 
@@ -34,9 +36,11 @@ public class StreamingJob {
         DataStream<SaturatedPointCalculation.SaturationResult> saturationResultsStream = tileLayerStream
             .map(tile -> SaturatedPointCalculation.analyzeSaturation(tile));
 
+        // Stream di input per la query2
         DataStream<TileLayerData> tileStream = saturationResultsStream
         .map(result -> result.tile);
 
+        // Stream per l'output della query 1
         DataStream<SaturationOutput> outputStream = saturationResultsStream
             .map(result -> new SaturationOutput(
                 result.tile.batchId,
@@ -52,7 +56,7 @@ public class StreamingJob {
         saturationOutputProcessor.writeToKafka(outputStream);
 
         // === Query 2 ===
-        DataStream<OutlierOutput> windowedStream = tileStream
+        DataStream<Outlier> windowedStream = tileStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
             .process(new OutlierDetection());
@@ -60,11 +64,32 @@ public class StreamingJob {
         // Output Query 2 (stampa di debug)
         windowedStream.print("Query 2 - Window");
 
+        // All'interno di outlierOutput abbiamo una lista di OutlierPoint, la flatmap si occupa di estrarre i punti e creare quindi uno stream per il clustering
+        DataStream<OutlierPoint> outlierPointStream = windowedStream
+            .flatMap((Outlier outlier, Collector<OutlierPoint> out) -> {
+                for (OutlierPoint point : outlier.outlierPoints) {
+                    out.collect(point);
+                }
+            })
+            .returns(OutlierPoint.class);
+        
+        // Creiamo lo stream di Output
+        DataStream<OutlierOutput> outlierOutputStream = windowedStream
+            .map(outlier -> new OutlierOutput(
+                outlier.batchId,
+                outlier.printId,
+                outlier.tileId,
+                outlier.pointsData
+            ))
+            .returns(OutlierOutput.class);
+
         // Output Query 2 (scrittura su Kafka)
         KafkaOutputProcessor<OutlierOutput> outlierOutputProcessor =
             new KafkaOutputProcessor<>("outlier-results-topic", new OutlierOutputSerializationSchema());
 
-        outlierOutputProcessor.writeToKafka(windowedStream);
+        outlierOutputProcessor.writeToKafka(outlierOutputStream);
+
+
 
         // Esecuzione del job
         env.execute("StreamingJob - Query 1 + Query 2");

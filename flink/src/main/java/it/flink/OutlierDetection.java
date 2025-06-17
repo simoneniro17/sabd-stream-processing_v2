@@ -7,10 +7,10 @@ import org.apache.flink.util.Collector;
 import java.util.*;
 
 
-public class OutlierDetection extends ProcessWindowFunction<TileLayerData, OutlierOutput, String, GlobalWindow> {
+public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Outlier, String, GlobalWindow> {
 
     @Override
-    public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<OutlierOutput> out) throws Exception {
+    public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<Outlier> out) throws Exception {
         List<TileLayerData> layers = new ArrayList<>();
         for (TileLayerData tile : elements) {
             layers.add(tile);
@@ -90,11 +90,12 @@ public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Outli
         }
 
         // Creiamo l'oggetto di output e lo inviamo al collector
-        OutlierOutput output = new OutlierOutput(
+        Outlier output = new Outlier(
                 mostRecentLayer.batchId,
                 mostRecentLayer.printId,
                 mostRecentLayer.tileId,
-                pointsData.toString()
+                pointsData.toString(),
+                top5
         );
         
         out.collect(output);
