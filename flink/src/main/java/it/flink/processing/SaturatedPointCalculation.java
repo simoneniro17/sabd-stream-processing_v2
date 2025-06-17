@@ -1,4 +1,6 @@
-package it.flink;
+package it.flink.processing;
+
+import it.flink.model.TileLayerData;
 
 public class SaturatedPointCalculation {
     public static class SaturationResult {

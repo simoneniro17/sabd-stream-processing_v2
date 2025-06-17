@@ -1,6 +1,8 @@
-package it.flink;
+package it.flink.utils;
 
 import org.apache.flink.api.common.functions.MapFunction;
+
+import it.flink.model.TileLayerData;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;

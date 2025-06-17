@@ -1,4 +1,4 @@
-package it.flink;
+package it.flink.model;
 
 import java.util.List;
 

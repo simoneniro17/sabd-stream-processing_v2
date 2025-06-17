@@ -1,6 +1,8 @@
-package it.flink;
+package it.flink.serialization;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+
+import it.flink.model.OutlierOutput;
 
 public class OutlierOutputSerializationSchema implements SerializationSchema<OutlierOutput> {
     @Override

@@ -1,4 +1,4 @@
-package it.flink;
+package it.flink.utils;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.connector.kafka.sink.KafkaSink;

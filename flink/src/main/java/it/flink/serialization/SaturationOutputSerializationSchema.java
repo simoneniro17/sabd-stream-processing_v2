@@ -1,6 +1,8 @@
-package it.flink;
+package it.flink.serialization;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+
+import it.flink.model.SaturationOutput;
 
 public class SaturationOutputSerializationSchema implements SerializationSchema<SaturationOutput>{
     @Override

@@ -1,4 +1,4 @@
-package it.flink;
+package it.flink.serialization;
 
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeHint;

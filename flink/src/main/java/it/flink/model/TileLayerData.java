@@ -1,4 +1,4 @@
-package it.flink;
+package it.flink.model;
 
 public class TileLayerData {
     public final String batchId;

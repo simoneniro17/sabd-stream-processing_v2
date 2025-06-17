@@ -1,8 +1,12 @@
-package it.flink;
+package it.flink.processing;
 
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.util.Collector;
+
+import it.flink.model.Outlier;
+import it.flink.model.OutlierPoint;
+import it.flink.model.TileLayerData;
 
 import java.util.*;
 
