@@ -7,6 +7,18 @@ import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.util.Collector;
 
+import it.flink.model.Outlier;
+import it.flink.model.OutlierOutput;
+import it.flink.model.OutlierPoint;
+import it.flink.model.SaturationOutput;
+import it.flink.model.TileLayerData;
+import it.flink.processing.OutlierDetection;
+import it.flink.processing.SaturatedPointCalculation;
+import it.flink.serialization.MsgPackDeserializationSchema;
+import it.flink.serialization.OutlierOutputSerializationSchema;
+import it.flink.serialization.SaturationOutputSerializationSchema;
+import it.flink.utils.KafkaMapFunction;
+import it.flink.utils.KafkaOutputProcessor;
 
 import java.util.Map;
 
@@ -22,7 +34,7 @@ public class StreamingJob {
             .setBootstrapServers("kafka:9092")
             .setTopics("gc-batches")
             .setGroupId("flink-consumer")
-            .setStartingOffsets(OffsetsInitializer.latest())
+            .setStartingOffsets(OffsetsInitializer.earliest()) // prima avevamo latest, ma ora riusciamo a leggere i dati che già erano presenti
             .setValueOnlyDeserializer(new MsgPackDeserializationSchema())   // Deserializer personaliizzatoo
             .build();
 
