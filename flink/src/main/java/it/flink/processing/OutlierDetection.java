@@ -10,153 +10,100 @@ import it.flink.model.TileLayerData;
 
 import java.util.*;
 
-
+/**
+ * Implementazione Query 2: analisi degli outlier su una finestra di 3 layer con sliding di 1.
+ * Per ogni punto, si calcola la deviazione di temperatura locale come differenza 
+ * tra la temperatura media dei punti vicini prossimi (distanza di Manhattan 0,1,2)
+ * e la temperatura media dei punti vicini esterni (distanza di Manhattan 3,4).
+ */
 public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Outlier, String, GlobalWindow> {
+    // Costanti utili
+    private static final int WINDOW_SIZE = 3;
+    private static final int SLIDE_SIZE = 1;
+    private static final int CLOSE_NEIGHBORS_MIN = 0;
+    private static final int CLOSE_NEIGHBORS_MAX = 2;
+    private static final int DISTANT_NEIGHBORS_MIN = 3;
+    private static final int DISTANT_NEIGHBORS_MAX = 4;
+    private static final int OUTLIER_THRESHOLD = 6000;
+    private static final int SENTINEL_VALUE = -1;
+    private static final int TOP_OUTLIERS_COUNT = 5;
 
     @Override
     public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<Outlier> out) throws Exception {
+        // Raccogliamo i layer nella finestra
+        List<TileLayerData> layers = collectLayers(elements);
+
+        // Verifichiamo che ci siano i tre layer necessari per l'analisi
+        if (layers.size() < WINDOW_SIZE) {
+            System.out.println("Dati insufficienti per " + key + ". Richiesti: " + WINDOW_SIZE + ", trovati: " + layers.size());
+            return;
+        }
+
+        // Prendiamo il layer più recente (la traccia ci dice così)
+        TileLayerData currentLayer = layers.get(layers.size() - 1);
+
+        // Cerchiamo gli outlier
+        List<OutlierPoint> outliers = findOutliers(layers);
+
+        // Creiamo l'output con i top 5 outlier
+        out.collect(createOutput(currentLayer, outliers));
+    }
+
+    /** Raccoglie e ordina i layer della finestra */
+    private List<TileLayerData> collectLayers(Iterable<TileLayerData> elements) {
         List<TileLayerData> layers = new ArrayList<>();
         for (TileLayerData tile : elements) {
             layers.add(tile);
         }
-        //ordiniamo i layer in base all'id che hanno (0,1,2)
+
+        // Ordiniamo i layer in base all'id che hanno
+        //TODO: ma siamo sicuri che vada bene fare questa cosa?
         layers.sort(Comparator.comparingInt(t -> t.layerId));
 
-        // STAMPA per capire cosa contiene la finestra
-        System.out.print("Window [" + key + "] contains layerIds: ");
-        for (TileLayerData tile : layers) {
-            System.out.print(tile.layerId + " ");
-        }
+        // Log di debug
+        System.out.print("Finestra contiene i layer: ");
+        layers.forEach(layer -> System.out.print(layer.layerId + " "));
         System.out.println();
 
-        //qui controlliamo che abbiamo alemno 3 layer per poter calcolare gli outlier
-        if (layers.size() < 3) {
-            System.out.println("Not enough data to detect outliers for key: " + key + ". Required: 3, Found: " + layers.size());
-            return;
-        }
+        return layers;
+    }
 
-        //selezioniamo l'ultimo layer che è quello più recente, prendiamo il 2 che è quello più recente
-        TileLayerData mostRecentLayer = layers.get(2);
+    /** Trovi i punti outlier nel layer corrente */
+    private List<OutlierPoint> findOutliers(List<TileLayerData> layers) {
+        List<OutlierPoint> outliers = new ArrayList<>();
+        TileLayerData currentLayer = layers.get(layers.size() - 1);
 
-        //prendiamo le infomrazioni della temperatura
-        int[][] matrix = mostRecentLayer.temperatureMatrix;
+        int[][] matrix = currentLayer.temperatureMatrix;
         int height = matrix.length;
         int width = matrix[0].length;
 
-        List<OutlierPoint> outliers = new ArrayList<>();
-        
-        //adniamo a iterare su tutti i pixel del layer
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-
-                if (matrix[y][x] == -1) {
-                    // saltiamo i pixel saturati (-1 valore sentinella)
-                    continue;
+                if (matrix[y][x] == SENTINEL_VALUE) {
+                    continue;   // Ignoriamo i punti saturati o vuoti (-1 valore sentinella)
                 }
 
-                //per ogni punto calcoliamo la media dei visini prossimi e lontani, i prossimi sono quelli 
-                //chhe hanno distanza di manhattan 0,1,2 e i lontani quelli che più lontani 3,4
+                // Calcoliamo le medie di temperatura dei vicini prossimi e lontani
+                double closeNeighborsAvg = calculateNeighborsAvg(x, y, layers, CLOSE_NEIGHBORS_MIN, CLOSE_NEIGHBORS_MAX);
+                double distantNeighborsAvg = calculateNeighborsAvg(x, y, layers, DISTANT_NEIGHBORS_MIN, DISTANT_NEIGHBORS_MAX);
 
-                double mediaViciniProssimi = calcolaMediaVicini(x, y, layers, 0, 2);
-                double mediaViciniLontani = calcolaMediaVicini(x, y, layers, 2, 4);
-                double deviation = Math.abs(mediaViciniProssimi - mediaViciniLontani);
+                // Calcoliamo la deviazione tra le due medie
+                double deviation = Math.abs(closeNeighborsAvg - distantNeighborsAvg);
 
-                if (deviation > 6000) {
+                // Se la deviazione supera la soglia, aggiungiamo il punto agli outlier
+                if (deviation > OUTLIER_THRESHOLD) {
                     outliers.add(new OutlierPoint(x, y, deviation));
                 }
             }
         }
 
-        // Ordina gli outlier per deviazione decrescente
+        // Ordiniamo gli outlier per deviazione decrescente
         outliers.sort((o1, o2) -> Double.compare(o2.deviation, o1.deviation));
-
-        // prendiamo i primi 5 outlier
-        // Se ci sono meno di 5 outlier, prenderemo solo quelli disponibili
-        List<OutlierPoint> top5 = outliers.subList(0, Math.min(5, outliers.size()));
-
-        // Preparazione dei dati CSV per la parte dei punti e deviazioni
-        // StringBuilder pointsData = new StringBuilder();
-        StringBuilder p1 = new StringBuilder();
-        StringBuilder p2 = new StringBuilder();
-        StringBuilder p3 = new StringBuilder();
-        StringBuilder p4 = new StringBuilder();
-        StringBuilder p5 = new StringBuilder();
-
-        StringBuilder dp1 = new StringBuilder();
-        StringBuilder dp2 = new StringBuilder();
-        StringBuilder dp3 = new StringBuilder();
-        StringBuilder dp4 = new StringBuilder();
-        StringBuilder dp5 = new StringBuilder();
-
-        // Prepara i dati dei top 5 punti
-        for (int i = 0; i < 5; i++) {
-            if (i < top5.size()) {
-                OutlierPoint p = top5.get(i);
-                switch (i) {
-                    case 0:
-                        p1.append("(").append(p.x).append(";").append(p.y).append(")");
-                        dp1.append(String.format("%.2f", p.deviation));
-                        break;
-                    case 1:
-                        p2.append("(").append(p.x).append(";").append(p.y).append(")");
-                        dp2.append(String.format("%.2f", p.deviation));
-                        break;
-                    case 2:
-                        p3.append("(").append(p.x).append(";").append(p.y).append(")");
-                        dp3.append(String.format("%.2f", p.deviation));
-                        break;
-                    case 3:
-                        p4.append("(").append(p.x).append(";").append(p.y).append(")");
-                        dp4.append(String.format("%.2f", p.deviation));
-                        break;
-                    case 4:
-                        p5.append("(").append(p.x).append(";").append(p.y).append(")");
-                        dp5.append(String.format("%.2f", p.deviation));
-                        break;
-                }
-            } else {
-                // Se abbiamo meno di 5 punti, lascia vuoti i restanti
-                switch (i) {
-                    case 0:
-                        p1.append("()");
-                        // p1.append("(null)"); NEL CASO IN CUI VOLESSIMO METTERE DEI VALORI NULLI PER I PUNTI VUOTI
-                        // dp1.append("null"); 
-                        break;
-                    case 1: p2.append("()"); break;
-                    case 2: p3.append("()"); break;
-                    case 3: p4.append("()"); break;
-                    case 4: p5.append("()"); break;
-                }
-            }
-        }
-
-        Outlier output = new Outlier();
-        output.batchId = mostRecentLayer.batchId;
-        output.printId = mostRecentLayer.printId;
-        output.tileId = mostRecentLayer.tileId;
-
-        output.p1 = p1.toString();
-        output.dp1 = dp1.toString();
-        output.p2 = p2.toString();
-        output.dp2 = dp2.toString();
-        output.p3 = p3.toString();
-        output.dp3 = dp3.toString();
-        output.p4 = p4.toString();
-        output.dp4 = dp4.toString();
-        output.p5 = p5.toString();
-        output.dp5 = dp5.toString();
-
-        output.outlierPoints = outliers; // Salviamo la lista di outlier points per il clustering
-        
-        out.collect(output);
+        return outliers;
     }
 
-
-
-
-    //funziona usata per calcolare la distanza di manhattan in 3 dimensioni dove la terza dimensione è il layer
-    private double calcolaMediaVicini(int x0, int y0, List<TileLayerData> layers, int dMin, int dMax) {
-
+    /** Calcola la media dei vicini a una distanza specificata dal punto (x,y) */
+    private double calculateNeighborsAvg(int x0, int y0, List<TileLayerData> layers, int minDist, int maxDist) {
         int sum = 0;
         int count = 0;
 
@@ -169,18 +116,26 @@ public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Outli
             int[][] matrix = layers.get(layerIdx).temperatureMatrix;
 
             // Iteriamo sui pixel attorno a (x0, y0) in un quadrato di lato 2*dMax+1
-            for (int dy = -dMax; dy <= dMax; dy++) {
-                for (int dx = -dMax; dx <= dMax; dx++) {
+            for (int dy = -maxDist; dy <= maxDist; dy++) {
+                for (int dx = -maxDist; dx <= maxDist; dx++) {
                     int x = x0 + dx;
                     int y = y0 + dy;
 
+                    // Verifichiamo che il punto sia all'interno della matrice
                     if (x >= 0 && x < width && y >= 0 && y < height) {
-                        // Calcoliamo la distanza di Manhattan considerando il layer come z
+                        // Ignoriamo i punti saturati o vuoti (-1 valore sentinella)
+                        // In questo modo anche i punti nuovi che raggiungiamo a partire da x0 e y0 muovendoci sulla griglia
+                        // non vengono considerati se sono saturati o vuoti
+                        if (matrix[y][x] == SENTINEL_VALUE) {
+                            continue;
+                        }
+
+                        // Calcoliamo la distanza di Manhattan in 3D (il layer sarebbe la nostra z)
                         int dz = Math.abs(numLayers - 1 - layerIdx);
-                        
-                        int manhattan = Math.abs(dx) + Math.abs(dy) + dz;
-                        // Se la distanza è nel range richiesto, includiamo il pixel nella media
-                        if (manhattan >= dMin && manhattan <= dMax) {
+                        int manhattanDistance = Math.abs(dx) + Math.abs(dy) + dz;
+
+                        // Se la distanza è nel range richiesto, includiamo il punto nella media
+                        if (manhattanDistance >= minDist && manhattanDistance <= maxDist) {
                             sum += matrix[y][x];
                             count++;
                         }
@@ -192,8 +147,52 @@ public class OutlierDetection extends ProcessWindowFunction<TileLayerData, Outli
         if (count == 0) {
             return 0.0;
         } else {
-            return sum / (double) count;
+            return sum / (double)count;
         }
+    }
+
+    /** Crea l'output per la Query 2 con i top 5 outlier */
+    private Outlier createOutput(TileLayerData currentLayer, List<OutlierPoint> allOutliers) {
+        Outlier output = new Outlier();
+        output.batchId = currentLayer.batchId;
+        output.printId = currentLayer.printId;
+        output.tileId = currentLayer.tileId;
+        output.outlierPoints = allOutliers; // Salviamo tutti gli outlier per la Q3
+
+        // Estraiamo i primi 5 outlier (o tutti se ce ne sono meno di 5)
+        List<OutlierPoint> topOutliers = allOutliers.size() > TOP_OUTLIERS_COUNT ?
+                allOutliers.subList(0, TOP_OUTLIERS_COUNT) : allOutliers;
+                
+        formatOutlierOutput(output, topOutliers);
+
+        return output;
+    }
+
+    /** Formattiamo i dati degli outlier nell'oggetto di output */
+    private void formatOutlierOutput(Outlier output, List<OutlierPoint> topOutliers) {
+        // Array per i campi di output
+        String[] points = new String[TOP_OUTLIERS_COUNT];
+        String[] deviations = new String[TOP_OUTLIERS_COUNT];
+
+        // Inizializziamo gli array
+        for (int i = 0; i < TOP_OUTLIERS_COUNT; i++) {
+            points[i] = "()";
+            deviations[i] = "";
+        }
+
+        // Popoliamo gli array con i dati che abbiamo
+        for (int i = 0; i < topOutliers.size(); i++) {
+            OutlierPoint point = topOutliers.get(i);
+            points[i] = String.format("(%d;%d)", point.x, point.y);
+            deviations[i] = String.format("%.2f", point.deviation);
+        }
+
+        // Assegniamo i valori formattati all'output
+        output.p1 = points[0]; output.dp1 = deviations[0];
+        output.p2 = points[1]; output.dp2 = deviations[1];
+        output.p3 = points[2]; output.dp3 = deviations[2];
+        output.p4 = points[3]; output.dp4 = deviations[3];
+        output.p5 = points[4]; output.dp5 = deviations[4];
     }
 }
 

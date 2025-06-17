@@ -22,38 +22,59 @@ import it.flink.utils.KafkaOutputProcessor;
 
 import java.util.Map;
 
-public class StreamingJob {
-    public static void main(String[] args) throws Exception {
 
+/**
+ * Classe principale per l'esecuzione del job di streaming in Flink.
+ * Legge dati da Kafka, esegue le query di analisi e scrive i risultati su Kafka.
+ */
+public class StreamingJob {
+    // Configurazione Kafka
+    private static final String KAFKA_BOOTSTRAP_SERVER = "kafka:9092";
+    private static final String INPUT_TOPIC = "gc-batches";
+    private static final String SATURATION_OUTPUT_TOPIC = "saturation-results-topic";
+    private static final String OUTLIER_OUTPUT_TOPIC = "outlier-results-topic";
+
+    public static void main(String[] args) throws Exception {
         // Definiamo l'ambiente di esecuzione
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         // TODO: se si vuole eseguire in parallelo su più task manager, impostare il parallelismo
+        // env.setParallelism(2);
 
-        // Definiamo la sorgente Kafka
-        KafkaSource<Map<String, Object>> source = KafkaSource.<Map<String, Object>>builder()
-            .setBootstrapServers("kafka:9092")
-            .setTopics("gc-batches")
-            .setGroupId("flink-consumer")
-            .setStartingOffsets(OffsetsInitializer.earliest()) // prima avevamo latest, ma ora riusciamo a leggere i dati che già erano presenti
-            .setValueOnlyDeserializer(new MsgPackDeserializationSchema())   // Deserializer personaliizzatoo
-            .build();
-
-        //  Creiamo il DataStream dalla sorgente Kafka
-        DataStream<Map<String, Object>> kafkaStream = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
+        // Configurazione e creazione del DataStream dalla sorgente Kafka
+        DataStream<Map<String, Object>> kafkaStream = createKafkaSource(env);
 
         // Convertiamo il DataStream originale da Kafka in un DataStream di TileLayerData con la map personalizzata
         DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new KafkaMapFunction());
 
-        // === Query 1 ===
-        DataStream<SaturatedPointCalculation.SaturationResult> saturationResultsStream = tileLayerStream
-            .map(tile -> SaturatedPointCalculation.analyzeSaturation(tile));
+        // Esecuzione Query 1
+        processQuery1(tileLayerStream);
 
-        // Stream di input per la query2
-        DataStream<TileLayerData> tileStream = saturationResultsStream
-        .map(result -> result.tile);
+        // Preparazione input per Query 2
+        DataStream<TileLayerData> tileStream = processSaturation(tileLayerStream);
 
-        // Stream per l'output della query 1
-        DataStream<SaturationOutput> outputStream = saturationResultsStream
+        // Esecuzione Query 2
+        processQuery2(tileStream);
+
+        // Esecuzione del job
+        env.execute("StreamingJob");
+    }
+
+    private static DataStream<Map<String, Object>> createKafkaSource(StreamExecutionEnvironment env) {
+        KafkaSource<Map<String, Object>> source = KafkaSource.<Map<String, Object>>builder()
+            .setBootstrapServers(KAFKA_BOOTSTRAP_SERVER)
+            .setTopics(INPUT_TOPIC)
+            .setGroupId("flink-consumer")
+            .setStartingOffsets(OffsetsInitializer.earliest())  // Con "earliest" leggiamo messaggi nel topic scritti prima dell'avvio del job
+            .setValueOnlyDeserializer(new MsgPackDeserializationSchema())   // Deserializer personalizzato
+            .build();
+
+        return env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
+    }
+    
+    private static void processQuery1(DataStream<TileLayerData> tileLayerStream) {
+        // Analisi dei punti
+        DataStream<SaturationOutput> outputStream = tileLayerStream
+            .map(tile -> SaturatedPointCalculation.analyzeSaturation(tile))
             .map(result -> new SaturationOutput(
                 result.tile.batchId,
                 result.tile.printId,
@@ -62,12 +83,20 @@ public class StreamingJob {
             ))
             .returns(SaturationOutput.class);
 
-        KafkaOutputProcessor<SaturationOutput> saturationOutputProcessor = 
-            new KafkaOutputProcessor<>("saturation-results-topic", new SaturationOutputSerializationSchema());
+        // Output su Kafka
+        new KafkaOutputProcessor<>(SATURATION_OUTPUT_TOPIC, new SaturationOutputSerializationSchema())
+            .writeToKafka(outputStream);
+    }
 
-        saturationOutputProcessor.writeToKafka(outputStream);
+    private static DataStream<TileLayerData> processSaturation(DataStream<TileLayerData> tileLayerStream) {
+        return tileLayerStream
+            .map(tile -> SaturatedPointCalculation.analyzeSaturation(tile))
+            .map(result -> result.tile);
+            
+    }
 
-        // === Query 2 ===
+    private static void processQuery2(DataStream<TileLayerData> tileStream) {
+        // Processamento delle finestre scorrevoli
         DataStream<Outlier> windowedStream = tileStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
@@ -76,7 +105,7 @@ public class StreamingJob {
         // Output Query 2 (stampa di debug)
         windowedStream.print("Query 2 - Window");
 
-        // All'interno di outlierOutput abbiamo una lista di OutlierPoint, la flatmap si occupa di estrarre i punti e creare quindi uno stream per il clustering
+        // Estrazione punti outlier per l'input per la Query 3
         DataStream<OutlierPoint> outlierPointStream = windowedStream
             .flatMap((Outlier outlier, Collector<OutlierPoint> out) -> {
                 for (OutlierPoint point : outlier.outlierPoints) {
@@ -84,36 +113,23 @@ public class StreamingJob {
                 }
             })
             .returns(OutlierPoint.class);
-        
-        // Creiamo lo stream di Output
+
+        // Preparazione output per la Query 2
         DataStream<OutlierOutput> outlierOutputStream = windowedStream
             .map(outlier -> new OutlierOutput(
                 outlier.batchId,
                 outlier.printId,
                 outlier.tileId,
-                outlier.p1,
-                outlier.dp1,
-                outlier.p2,
-                outlier.dp2,
-                outlier.p3,
-                outlier.dp3,
-                outlier.p4,
-                outlier.dp4,
-                outlier.p5,
-                outlier.dp5
+                outlier.p1, outlier.dp1,
+                outlier.p2, outlier.dp2,
+                outlier.p3, outlier.dp3,
+                outlier.p4, outlier.dp4,
+                outlier.p5, outlier.dp5
             ))
             .returns(OutlierOutput.class);
 
         // Output Query 2 (scrittura su Kafka)
-        KafkaOutputProcessor<OutlierOutput> outlierOutputProcessor =
-            new KafkaOutputProcessor<>("outlier-results-topic", new OutlierOutputSerializationSchema());
-
-        outlierOutputProcessor.writeToKafka(outlierOutputStream);
-
-
-
-        // Esecuzione del job
-        env.execute("StreamingJob - Query 1 + Query 2");
-
+        new KafkaOutputProcessor<>(OUTLIER_OUTPUT_TOPIC, new OutlierOutputSerializationSchema())
+            .writeToKafka(outlierOutputStream);
     }
 }
