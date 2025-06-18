@@ -68,65 +68,29 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
     /** Trovi i punti outlier nel layer corrente */
     private List<OutlierPoint> findOutliers(List<TileLayerData> layers) {
         List<OutlierPoint> outliers = new ArrayList<>();
-        TileLayerData currentLayer = layers.get(layers.size() - 1);
 
-        int[][] matrix = currentLayer.temperatureMatrix;
-        int height = matrix.length;
-        int width = matrix[0].length;
-        
         // Creiamo una matrice 3D per rappresentare l'immagine, visto che abbiamo 3 layer uno sopra l'altro
         int depth = layers.size();
-        int[][][] temperature3d = new int[depth][][]; // 3 layer con dimensioni height x width
-        for (int i = 0; i < depth; i++) {
-            temperature3d[i] = layers.get(i).temperatureMatrix;
-        }
+        int[][][] temperature3d = createTemperature3DMatrix(layers); // 3 layer con dimensioni height x width
+        int height = temperature3d[0].length; // Altezza dell'immagine, che sarebbe il numero di righe della matrice
+        int width = temperature3d[0][0].length; // Larghezza dell'immagine, che sarebbe il numero di colonne della matrice
+        
+        // Matrice 2D per rappresentare l'ultimo layer
+        int[][] currentLayerMatrix = temperature3d[depth - 1];
 
         // Per ogni punto dell'ultimo layer
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
 
-                if (matrix[y][x] <= EMPTY_THRESHOLD || matrix[y][x] >= SATURATED_THRESHOLD) {
+                if (currentLayerMatrix[y][x] <= EMPTY_THRESHOLD || currentLayerMatrix[y][x] >= SATURATED_THRESHOLD) {
                     continue;   // Ignoriamo i punti saturati o vuoti
                 }
 
-                // Vicini prossimi
-                double closeNeighborsSum = 0.0;
-                int closeNeighborsCount = 0;
-                for (int j = -DISTANCE_FACTOR; j <= DISTANCE_FACTOR; j++) { // Scorriamo le righe
-                    for (int i = -DISTANCE_FACTOR; i <= DISTANCE_FACTOR; i++) { // Scorriamo le colonne
-                        for (int d = 0; d < depth; d++) {   // Scorriamo i layer
-                            
-                            int manhattanDistance = Math.abs(i) + Math.abs(j) + Math.abs(depth - 1 - d);
-                            if (manhattanDistance <= DISTANCE_FACTOR) {
-                                closeNeighborsSum += getValue(temperature3d, d, y + j, x + i);
-                                closeNeighborsCount++;
-                            }
-                        }
-                    }
-                }
-
-                // Vicini lontani
-                double distantNeighborsSum = 0.0;
-                int distantNeighborsCount = 0;
-                for (int j = -2*DISTANCE_FACTOR; j <= 2*DISTANCE_FACTOR; j++) { // Scorriamo le righe
-                    for (int i = -2*DISTANCE_FACTOR; i <= 2*DISTANCE_FACTOR; i++) { // Scorriamo le colonne
-                        for (int d = 0; d < depth; d++) {   // Scorriamo i layer
-                            
-                            int manhattanDistance = Math.abs(i) + Math.abs(j) + Math.abs(depth - 1 - d);
-                            if (manhattanDistance > DISTANCE_FACTOR && manhattanDistance <= 2 * DISTANCE_FACTOR) {
-                                distantNeighborsSum += getValue(temperature3d, d, y + j, x + i);
-                                distantNeighborsCount++;
-                            }
-                        }
-                    }
-                }
-
-                // Calcoliamo le medie dei vicini
-                double closeNeighborsAvg = closeNeighborsCount > 0 ? closeNeighborsSum / closeNeighborsCount : 0.0;
-                double distantNeighborsAvg = distantNeighborsCount > 0 ? distantNeighborsSum / distantNeighborsCount : 0.0;
+                // Calcoliamo le statistiche dei vicini per il punto corrente
+                NeighborStats stats = calculateNeighborStats(temperature3d, depth, y, x);
 
                 // Calcoliamo la deviazione tra le due medie
-                double deviation = Math.abs(closeNeighborsAvg - distantNeighborsAvg);
+                double deviation = Math.abs(stats.getCloseAvg() - stats.getDistantAvg());
 
                 // Aggiungiamo il punto agli outlier se la deviazione supera la soglia
                 if (deviation > OUTLIER_THRESHOLD) {
@@ -141,6 +105,69 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
         return outliers;
     }
 
+    /** Crea una matrice 3D di temperature dai layer */
+    private int[][][] createTemperature3DMatrix(List<TileLayerData> layers) {
+        int depth = layers.size();
+        int[][][] temperature3d = new int[depth][][];
+
+        for (int d = 0; d < depth; d++) {
+            temperature3d[d] = layers.get(d).temperatureMatrix;
+        }
+        return temperature3d;
+    }
+
+    /** Classe ausiliaria per rappresentare le statistiche dei vicini */
+    private static class NeighborStats {
+        double closeSum = 0;
+        int closeCount = 0;
+        double distantSum = 0;
+        int distantCount = 0;
+
+        double getCloseAvg() {
+            return closeCount > 0 ? closeSum / closeCount : 0.0;
+        }
+
+        double getDistantAvg() {
+            return distantCount > 0 ? distantSum / distantCount : 0.0;
+        }
+    }
+
+    /** Calcola le statistiche dei vicini per un punto specifico */
+    private NeighborStats calculateNeighborStats(int[][][] temperature3d, int depth, int y, int x) {
+        NeighborStats stats = new NeighborStats();
+
+        // Vicini prossimi
+        for (int j = -DISTANCE_FACTOR; j <= DISTANCE_FACTOR; j++) { // Scorriamo le righe
+            for (int i = -DISTANCE_FACTOR; i <= DISTANCE_FACTOR; i++) { // Scorriamo le colonne
+                for (int d = 0; d < depth; d++) {   // Scorriamo i layer
+
+                    int manhattanDistance = Math.abs(i) + Math.abs(j) + Math.abs(depth - 1 - d);
+                    if (manhattanDistance <= DISTANCE_FACTOR) {
+                        stats.closeSum += getValue(temperature3d, d, y + j, x + i);
+                        stats.closeCount++;
+                    }
+                }
+            }
+        }
+
+        // Vicini lontani
+        for (int j = -2 * DISTANCE_FACTOR; j <= 2 * DISTANCE_FACTOR; j++) { // Scorriamo le righe
+            for (int i = -2 * DISTANCE_FACTOR; i <= 2 * DISTANCE_FACTOR; i++) { // Scorriamo le colonne
+                for (int d = 0; d < depth; d++) {   // Scorriamo i layer
+
+                    int manhattanDistance = Math.abs(i) + Math.abs(j) + Math.abs(depth - 1 - d);
+                    if (manhattanDistance > DISTANCE_FACTOR && manhattanDistance <= 2 * DISTANCE_FACTOR) {
+                        stats.distantSum += getValue(temperature3d, d, y + j, x + i);
+                        stats.distantCount++;
+                    }
+                }
+            }
+        }
+
+        return stats;
+    }
+
+    /** Restituisce il valore della temperatura per un dato punto, o 0 se fuori dai limiti */
     private double getValue(int[][][] image, int d, int y, int x) {
         if(d < 0 || d >= image.length || y < 0 || y >= image[d].length || x < 0 || x >= image[d][y].length) {
             return 0.0;
