@@ -8,10 +8,12 @@ import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsIni
 import org.apache.flink.util.Collector;
 
 import it.flink.model.OutlierResult;
+import it.flink.model.ClusteredResult;
 import it.flink.model.OutlierPoint;
 import it.flink.model.SaturationResult;
 import it.flink.model.TileLayerData;
 import it.flink.processing.Query2;
+import it.flink.processing.Query3;
 import it.flink.processing.Query1;
 import it.flink.serialization.MsgPackDeserializationSchema;
 import it.flink.serialization.OutlierResultSerializationSchema;
@@ -56,7 +58,12 @@ public class StreamingJob {
 
         // Preparazione input per Query 3
         DataStream<OutlierPoint> outlierPoints = processOutliers(windowedStream);
-        
+
+        // Applica Query3 con il clustering DBSCAN
+        DataStream<ClusteredResult> clusteredStream = windowedStream.map(new Query3());
+
+        // Se vuoi, puoi stampare il risultato o pubblicarlo su Kafka
+        clusteredStream.print("Clustered Results");
 
         // Esecuzione del job
         env.execute("StreamingJob");
@@ -118,8 +125,8 @@ public class StreamingJob {
         windowedStream.print("Query 2 - Window");
 
         // Output Query 2 (scrittura su Kafka)
-        new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new OutlierResultSerializationSchema())
-            .writeToKafka(windowedStream);
+        // new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new OutlierResultSerializationSchema())
+        //     .writeToKafka(windowedStream);
 
         return windowedStream;
     }
