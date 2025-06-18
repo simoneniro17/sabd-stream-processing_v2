@@ -56,14 +56,14 @@ public class StreamingJob {
         // Esecuzione Query 2
         DataStream<OutlierResult> windowedStream = processQuery2(tileStream);
 
-        // Preparazione input per Query 3
+        // // Preparazione input per Query 3
         DataStream<OutlierPoint> outlierPoints = processOutliers(windowedStream);
 
-        // Applica Query3 con il clustering DBSCAN
-        DataStream<ClusteredResult> clusteredStream = windowedStream.map(new Query3());
+        // // Applica Query3 con il clustering DBSCAN
+        // DataStream<ClusteredResult> clusteredStream = windowedStream.map(new Query3());
 
-        // Se vuoi, puoi stampare il risultato o pubblicarlo su Kafka
-        clusteredStream.print("Clustered Results");
+        // // Se vuoi, puoi stampare il risultato o pubblicarlo su Kafka
+        // clusteredStream.print("Clustered Results");
 
         // Esecuzione del job
         env.execute("StreamingJob");
@@ -125,8 +125,8 @@ public class StreamingJob {
         windowedStream.print("Query 2 - Window");
 
         // Output Query 2 (scrittura su Kafka)
-        // new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new OutlierResultSerializationSchema())
-        //     .writeToKafka(windowedStream);
+        new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new OutlierResultSerializationSchema())
+             .writeToKafka(windowedStream);
 
         return windowedStream;
     }

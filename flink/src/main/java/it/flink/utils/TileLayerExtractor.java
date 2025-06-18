@@ -89,6 +89,14 @@ public class TileLayerExtractor implements MapFunction<Map<String, Object>, Tile
         int height = img.getHeight();
 
         // Assumiamo che l'immagine sia in scala di grigi e creiamo una matrice di temperature
+        // La matrice è organizzata come [y][x], dove y è la riga e x è la colonna
+
+        // è un po' controintuitivo, ma praticamente nelle coordinate dell'immaagine (x,y)
+        // avere (0,1) significa spostarsi di 1 verso il basso, non verso destra come ci si aspetterebbe
+        // quando ci muoviamo in una matrice
+
+        // per questo la matrice la creiamo di dimensione [height][width], perché height è l'altezza dell'immagine
+        // (che corrisponde al numero di righe) e width è la larghezza dell'immagine (che corrisponde al numero di colonne)
         int[][] temperatureMatrix = new int[height][width];
 
         for (int y = 0; y < height; y++) {

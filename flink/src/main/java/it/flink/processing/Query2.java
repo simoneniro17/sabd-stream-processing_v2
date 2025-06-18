@@ -19,12 +19,10 @@ import java.util.*;
 public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, String, GlobalWindow> {
     // Costanti utili
     private static final int WINDOW_SIZE = 3;
-    private static final int CLOSE_NEIGHBORS_MIN = 0;
-    private static final int CLOSE_NEIGHBORS_MAX = 2;
-    private static final int DISTANT_NEIGHBORS_MIN = 3;
-    private static final int DISTANT_NEIGHBORS_MAX = 4;
+    private static final int EMPTY_THRESHOLD = 5000;
+    private static final int SATURATED_THRESHOLD = 65000;
     private static final int OUTLIER_THRESHOLD = 6000;
-    private static final int SENTINEL_VALUE = -1;
+    private static final int DISTANCE_FACTOR = 2;
     private static final int TOP_OUTLIERS_COUNT = 5;
 
     @Override
@@ -75,23 +73,65 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
         int[][] matrix = currentLayer.temperatureMatrix;
         int height = matrix.length;
         int width = matrix[0].length;
+        
+        // Creiamo una matrice 3D per rappresentare l'immagine, visto che abbiamo 3 layer uno sopra l'altro
+        int depth = layers.size();
+        int[][][] temperature3d = new int[depth][][]; // 3 layer con dimensioni height x width
+        for (int i = 0; i < depth; i++) {
+            temperature3d[i] = layers.get(i).temperatureMatrix;
+        }
 
+        // Per ogni punto dell'ultimo layer
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                if (matrix[y][x] == SENTINEL_VALUE) {
-                    continue;   // Ignoriamo i punti saturati o vuoti (-1 valore sentinella)
+
+                if (matrix[y][x] <= EMPTY_THRESHOLD || matrix[y][x] >= SATURATED_THRESHOLD) {
+                    continue;   // Ignoriamo i punti saturati o vuoti
                 }
 
-                // Calcoliamo le medie di temperatura dei vicini prossimi e lontani
-                double closeNeighborsAvg = calculateNeighborsAvg(x, y, layers, CLOSE_NEIGHBORS_MIN, CLOSE_NEIGHBORS_MAX);
-                double distantNeighborsAvg = calculateNeighborsAvg(x, y, layers, DISTANT_NEIGHBORS_MIN, DISTANT_NEIGHBORS_MAX);
+                // Vicini prossimi
+                double closeNeighborsSum = 0.0;
+                int closeNeighborsCount = 0;
+                for (int j = -DISTANCE_FACTOR; j <= DISTANCE_FACTOR; j++) { // Scorriamo le righe
+                    for (int i = -DISTANCE_FACTOR; i <= DISTANCE_FACTOR; i++) { // Scorriamo le colonne
+                        for (int d = 0; d < depth; d++) {   // Scorriamo i layer
+                            
+                            int manhattanDistance = Math.abs(i) + Math.abs(j) + Math.abs(depth - 1 - d);
+                            if (manhattanDistance <= DISTANCE_FACTOR) {
+                                closeNeighborsSum += getValue(temperature3d, d, y + j, x + i);
+                                closeNeighborsCount++;
+                            }
+                        }
+                    }
+                }
+
+                // Vicini lontani
+                double distantNeighborsSum = 0.0;
+                int distantNeighborsCount = 0;
+                for (int j = -2*DISTANCE_FACTOR; j <= 2*DISTANCE_FACTOR; j++) { // Scorriamo le righe
+                    for (int i = -2*DISTANCE_FACTOR; i <= 2*DISTANCE_FACTOR; i++) { // Scorriamo le colonne
+                        for (int d = 0; d < depth; d++) {   // Scorriamo i layer
+                            
+                            int manhattanDistance = Math.abs(i) + Math.abs(j) + Math.abs(depth - 1 - d);
+                            if (manhattanDistance > DISTANCE_FACTOR && manhattanDistance <= 2 * DISTANCE_FACTOR) {
+                                distantNeighborsSum += getValue(temperature3d, d, y + j, x + i);
+                                distantNeighborsCount++;
+                            }
+                        }
+                    }
+                }
+
+                // Calcoliamo le medie dei vicini
+                double closeNeighborsAvg = closeNeighborsCount > 0 ? closeNeighborsSum / closeNeighborsCount : 0.0;
+                double distantNeighborsAvg = distantNeighborsCount > 0 ? distantNeighborsSum / distantNeighborsCount : 0.0;
 
                 // Calcoliamo la deviazione tra le due medie
                 double deviation = Math.abs(closeNeighborsAvg - distantNeighborsAvg);
 
-                // Se la deviazione supera la soglia, aggiungiamo il punto agli outlier
+                // Aggiungiamo il punto agli outlier se la deviazione supera la soglia
                 if (deviation > OUTLIER_THRESHOLD) {
-                    outliers.add(new OutlierPoint(x, y, deviation));
+                    outliers.add(new OutlierPoint(x, y, deviation)); // SE COORDINATE DI OutlierPoint indicano quelle dell'immagine
+                    // outliers.add(new OutlierPoint(y, x, deviation)); // Se le coordinate di OutlierPoint indicano quelle della matrice E NON QUELLA DELL'IMMAGINE
                 }
             }
         }
@@ -101,53 +141,12 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
         return outliers;
     }
 
-    /** Calcola la media dei vicini a una distanza specificata dal punto (x,y) */
-    private double calculateNeighborsAvg(int x0, int y0, List<TileLayerData> layers, int minDist, int maxDist) {
-        int sum = 0;
-        int count = 0;
-
-        int height = layers.get(0).temperatureMatrix.length;
-        int width = layers.get(0).temperatureMatrix[0].length;
-        int numLayers = layers.size();
-
-        // Iteriamo su tutti i 3 layer
-        for (int layerIdx = 0; layerIdx < numLayers; layerIdx++) {
-            int[][] matrix = layers.get(layerIdx).temperatureMatrix;
-
-            // Iteriamo sui pixel attorno a (x0, y0) in un quadrato di lato 2*dMax+1
-            for (int dy = -maxDist; dy <= maxDist; dy++) {
-                for (int dx = -maxDist; dx <= maxDist; dx++) {
-                    int x = x0 + dx;
-                    int y = y0 + dy;
-
-                    // Verifichiamo che il punto sia all'interno della matrice
-                    if (x >= 0 && x < width && y >= 0 && y < height) {
-                        // Ignoriamo i punti saturati o vuoti (-1 valore sentinella)
-                        // In questo modo anche i punti nuovi che raggiungiamo a partire da x0 e y0 muovendoci sulla griglia
-                        // non vengono considerati se sono saturati o vuoti
-                        if (matrix[y][x] == SENTINEL_VALUE) {
-                            continue;
-                        }
-
-                        // Calcoliamo la distanza di Manhattan in 3D (il layer sarebbe la nostra z)
-                        int dz = Math.abs(numLayers - 1 - layerIdx);
-                        int manhattanDistance = Math.abs(dx) + Math.abs(dy) + dz;
-
-                        // Se la distanza è nel range richiesto, includiamo il punto nella media
-                        if (manhattanDistance >= minDist && manhattanDistance <= maxDist) {
-                            sum += matrix[y][x];
-                            count++;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (count == 0) {
+    private double getValue(int[][][] image, int d, int y, int x) {
+        if(d < 0 || d >= image.length || y < 0 || y >= image[d].length || x < 0 || x >= image[d][y].length) {
             return 0.0;
-        } else {
-            return sum / (double)count;
         }
+        return image[d][y][x];
+        
     }
 
     /** Crea l'output per la Query 2 con i top 5 outlier */
@@ -169,7 +168,8 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
         // Popoliamo gli array con i dati che abbiamo
         for (int i = 0; i < topOutliers.size(); i++) {
             OutlierPoint point = topOutliers.get(i);
-            points[i] = String.format("(%d;%d)", point.x, point.y);
+            points[i] = String.format("(%d;%d)", point.y, point.x); // Se li voglio stampare come coordinate della matrice
+            // points[i] = String.format("(%d;%d)", point.x, point.y); // Se li voglio stampare come coordinate dell'immagine
             deviations[i] = String.format("%.2f", point.deviation);
         }
 
@@ -186,12 +186,3 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
         );
     }
 }
-
-// output possibili:
-
-//Query 2 - Window> 3599,SI266220200309225433,15, P1=(), dP1=, P2=(), dP2=, P3=(), dP3=, P4=(), dP4=, P5=(), dP5=
-//può capitare che i valori siano vuoti questo è perche non è soddisfatta la condizione di deviazione > 6000
-
-//Query 2 - Window> 3562,SI266220200309225433,10, P1=(0,254), dP1=10404.53, P2=(0,339), dP2=10165.98, P3=(0,253), dP3=10133.04, P4=(0,338), dP4=10108.43, P5=(0,255), dP5=10083.14
-// dP1=10404.53 significa che c'è una forte differenza tra la media dei suoi vicini prossimi (vicini stretti, distanza ≤2) e quella dei vicini esterni (distanza 3-4) visto che supera la soglia di 6000
-// stessa cosa per gli altri punti

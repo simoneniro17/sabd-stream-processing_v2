@@ -2,6 +2,7 @@ package it.flink.model;
 
 /** Rappresenta un singolo punto outlier (i.e. con deviazione di temperatura locale
  * maggiore di 6000) con le sue coordinate (x, y) e la deviazione calcolata.
+ * TODO:Le coordinate sono relative alla matrice o alla immagine??
 */
 public class OutlierPoint {
     public final int x;

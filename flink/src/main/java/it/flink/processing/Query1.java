@@ -8,9 +8,7 @@ import it.flink.model.SaturationResult;
  * Implementazione query 1 per idnetificare i punti saturati in un'immagine TIFF 16 bit.
  */
 public class Query1 {
-    private static final int EMPTY_THRESHOLD = 5000; // Soglia per aree vuote
     private static final int SATURATED_THRESHOLD = 65000; // Soglia per punti saturati
-    private static final int SENTINEL_VALUE = -1; // Valore sentinella per punti non utilizzabili
 
     /**
      * Identifica punti critici per temperatura:
@@ -27,14 +25,8 @@ public class Query1 {
             for (int x = 0; x < width; x++) {
                 int temperature = matrix[y][x];
 
-                if (temperature < EMPTY_THRESHOLD ||  temperature > SATURATED_THRESHOLD) {
-                    // Marchiamo il punto così lo escludiamo dalle analisi successive
-                    matrix[y][x] = SENTINEL_VALUE;
-
-                    // e se è un punto saturo lo contiamo
-                    if (temperature > SATURATED_THRESHOLD) {
-                        saturatedCount++;
-                    }
+                if (temperature > SATURATED_THRESHOLD) {
+                    saturatedCount++;
                 }
             }
         }
