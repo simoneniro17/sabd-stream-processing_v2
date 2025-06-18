@@ -52,7 +52,11 @@ public class StreamingJob {
         DataStream<TileLayerData> tileStream = processSaturation(tileLayerStream);
 
         // Esecuzione Query 2
-        processQuery2(tileStream);
+        DataStream<OutlierResult> windowedStream = processQuery2(tileStream);
+
+        // Preparazione input per Query 3
+        DataStream<OutlierPoint> outlierPoints = processOutliers(windowedStream);
+        
 
         // Esecuzione del job
         env.execute("StreamingJob");
@@ -94,7 +98,16 @@ public class StreamingJob {
             
     }
 
-    private static void processQuery2(DataStream<TileLayerData> tileStream) {
+    private static DataStream<OutlierPoint> processOutliers(DataStream<OutlierResult> windowedStream){
+            return windowedStream.flatMap((OutlierResult outlier, Collector<OutlierPoint> out) -> {
+                for (OutlierPoint point : outlier.outlierPoints) {
+                    out.collect(point);
+                }
+            })
+            .returns(OutlierPoint.class);
+    }
+
+    private static DataStream<OutlierResult> processQuery2(DataStream<TileLayerData> tileStream) {
         // Processamento delle finestre scorrevoli
         DataStream<OutlierResult> windowedStream = tileStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
@@ -104,17 +117,10 @@ public class StreamingJob {
         // Output Query 2 (stampa di debug)
         windowedStream.print("Query 2 - Window");
 
-        // Estrazione punti outlier per l'input per la Query 3
-        DataStream<OutlierPoint> outlierPointStream = windowedStream
-            .flatMap((OutlierResult outlier, Collector<OutlierPoint> out) -> {
-                for (OutlierPoint point : outlier.outlierPoints) {
-                    out.collect(point);
-                }
-            })
-            .returns(OutlierPoint.class);
-
         // Output Query 2 (scrittura su Kafka)
         new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new OutlierResultSerializationSchema())
             .writeToKafka(windowedStream);
+
+        return windowedStream;
     }
 }
