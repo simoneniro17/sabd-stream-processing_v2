@@ -5,19 +5,14 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
-import org.apache.flink.util.Collector;
-
-import it.flink.model.OutlierResult;
-import it.flink.model.ClusteredResult;
-import it.flink.model.OutlierPoint;
-import it.flink.model.SaturationResult;
 import it.flink.model.TileLayerData;
 import it.flink.processing.Query2;
 import it.flink.processing.Query3;
 import it.flink.processing.Query1;
 import it.flink.serialization.MsgPackDeserializationSchema;
-import it.flink.serialization.OutlierResultSerializationSchema;
-import it.flink.serialization.SaturationResultSerializationSchema;
+import it.flink.serialization.Query2OutputSerializationSchema;
+import it.flink.serialization.Query1OutputSerializationSchema;
+import it.flink.serialization.Query3OutputSerializationSchema;
 import it.flink.utils.TileLayerExtractor;
 import it.flink.utils.KafkaResultPublisher;
 
@@ -48,22 +43,14 @@ public class StreamingJob {
         DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new TileLayerExtractor());
 
         // Esecuzione Query 1
-        processQuery1(tileLayerStream);
-
-        // Preparazione input per Query 2
-        DataStream<TileLayerData> tileStream = processSaturation(tileLayerStream);
+        tileLayerStream = processQuery1(tileLayerStream);
+        tileLayerStream.print("Query 1 - Saturation Results");
 
         // Esecuzione Query 2
-        DataStream<OutlierResult> windowedStream = processQuery2(tileStream);
+        tileLayerStream = processQuery2(tileLayerStream);
 
-        // // Preparazione input per Query 3
-        DataStream<OutlierPoint> outlierPoints = processOutliers(windowedStream);
-
-        // // Applica Query3 con il clustering DBSCAN
-        // DataStream<ClusteredResult> clusteredStream = windowedStream.map(new Query3());
-
-        // // Se vuoi, puoi stampare il risultato o pubblicarlo su Kafka
-        // clusteredStream.print("Clustered Results");
+        // Esecuzione Query 3
+        tileLayerStream = processQuery3(tileLayerStream);
 
         // Esecuzione del job
         env.execute("StreamingJob");
@@ -81,53 +68,41 @@ public class StreamingJob {
         return env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
     }
     
-    private static void processQuery1(DataStream<TileLayerData> tileLayerStream) {
-        // Analisi dei punti
-        DataStream<SaturationResult> outputStream = tileLayerStream
-            .map(tile -> Query1.analyzeSaturation(tile))
-            .map(result -> new SaturationResult(
-                result.tile.batchId,
-                result.tile.printId,
-                result.tile.tileId,
-                result.saturatedCount
-            ))
-            .returns(SaturationResult.class);
+
+    private static DataStream<TileLayerData> processQuery1 (DataStream<TileLayerData> tileLayerStream) {
+        tileLayerStream = tileLayerStream
+            .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class);
 
         // Output su Kafka
-        new KafkaResultPublisher<>(SATURATION_OUTPUT_TOPIC, new SaturationResultSerializationSchema())
-            .writeToKafka(outputStream);
+        new KafkaResultPublisher<>(SATURATION_OUTPUT_TOPIC, new Query1OutputSerializationSchema(), "Q1-sink-")
+            .writeToKafka(tileLayerStream);
+
+        return tileLayerStream;
+        
     }
 
-    private static DataStream<TileLayerData> processSaturation(DataStream<TileLayerData> tileLayerStream) {
-        return tileLayerStream
-            .map(tile -> Query1.analyzeSaturation(tile))
-            .map(result -> result.tile);
-            
-    }
-
-    private static DataStream<OutlierPoint> processOutliers(DataStream<OutlierResult> windowedStream){
-            return windowedStream.flatMap((OutlierResult outlier, Collector<OutlierPoint> out) -> {
-                for (OutlierPoint point : outlier.outlierPoints) {
-                    out.collect(point);
-                }
-            })
-            .returns(OutlierPoint.class);
-    }
-
-    private static DataStream<OutlierResult> processQuery2(DataStream<TileLayerData> tileStream) {
+    private static DataStream<TileLayerData> processQuery2(DataStream<TileLayerData> tileLayerStream) {
         // Processamento delle finestre scorrevoli
-        DataStream<OutlierResult> windowedStream = tileStream
+        tileLayerStream = tileLayerStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
             .process(new Query2());
 
-        // Output Query 2 (stampa di debug)
-        windowedStream.print("Query 2 - Window");
-
         // Output Query 2 (scrittura su Kafka)
-        new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new OutlierResultSerializationSchema())
-             .writeToKafka(windowedStream);
+        new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new Query2OutputSerializationSchema(), "Q2-sink-")
+             .writeToKafka(tileLayerStream);
 
-        return windowedStream;
+        return tileLayerStream;
+    }
+
+    private static DataStream<TileLayerData> processQuery3(DataStream<TileLayerData> tileLayerStream) {
+
+        tileLayerStream = tileLayerStream.map(new Query3());
+
+        // Output Query 3 (scrittura su Kafka)
+        new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new Query3OutputSerializationSchema(), "Q3-sink-")
+             .writeToKafka(tileLayerStream);
+
+        return tileLayerStream;
     }
 }

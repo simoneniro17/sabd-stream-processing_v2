@@ -4,7 +4,6 @@ import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow;
 import org.apache.flink.util.Collector;
 
-import it.flink.model.OutlierResult;
 import it.flink.model.OutlierPoint;
 import it.flink.model.TileLayerData;
 
@@ -16,7 +15,7 @@ import java.util.*;
  * tra la temperatura media dei punti vicini prossimi (distanza di Manhattan 0,1,2)
  * e la temperatura media dei punti vicini esterni (distanza di Manhattan 3,4).
  */
-public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, String, GlobalWindow> {
+public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,String, GlobalWindow> {
     // Costanti utili
     private static final int WINDOW_SIZE = 3;
     private static final int EMPTY_THRESHOLD = 5000;
@@ -26,7 +25,7 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
     private static final int TOP_OUTLIERS_COUNT = 5;
 
     @Override
-    public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<OutlierResult> out) throws Exception {
+    public void process(String key, Context context, Iterable<TileLayerData> elements, Collector<TileLayerData> out) throws Exception {
         // Raccogliamo i layer nella finestra
         List<TileLayerData> layers = collectLayers(elements);
 
@@ -177,7 +176,7 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
     }
 
     /** Crea l'output per la Query 2 con i top 5 outlier */
-    private OutlierResult createOutput(TileLayerData currentLayer, List<OutlierPoint> allOutliers) {
+    private TileLayerData createOutput(TileLayerData currentLayer, List<OutlierPoint> allOutliers) {
         // Array per i campi di output
         String[] points = new String[TOP_OUTLIERS_COUNT];
         String[] deviations = new String[TOP_OUTLIERS_COUNT];
@@ -200,10 +199,13 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, OutlierResult, 
             deviations[i] = String.format("%.2f", point.deviation);
         }
 
-        return new OutlierResult(
+        return new TileLayerData(
                 currentLayer.batchId,
                 currentLayer.printId,
                 currentLayer.tileId,
+                currentLayer.layerId,
+                currentLayer.temperatureMatrix,
+                currentLayer.saturatedCount,
                 points[0], deviations[0],
                 points[1], deviations[1],
                 points[2], deviations[2],

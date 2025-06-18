@@ -1,5 +1,7 @@
 package it.flink.model;
 
+import java.util.List;
+
 /** Rappresenta i dati di un singolo tile all'interno di un layer */
 public class TileLayerData {
     public final String batchId;
@@ -8,6 +10,23 @@ public class TileLayerData {
     public final int layerId;
     public final int[][] temperatureMatrix; 
 
+    // Conteggio dei punti saturati
+    public int saturatedCount;
+
+    // Top 5 outlier formattati per l'output (calcolati da Q2)
+    public String p1; public String dp1;
+    public String p2; public String dp2;
+    public String p3; public String dp3;
+    public String p4; public String dp4;
+    public String p5; public String dp5;
+
+    // Lista completa degli outlier per il clustering nella Q3
+    public List<OutlierPoint> outlierPoints;
+
+    // Lista dei cluster risultanti dal clustering DBSCAN (calcolati da Q3)
+    public List<Cluster> clusters;
+
+    // Costruttore di default 
     public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix) {
         this.batchId = batchId;
         this.printId = printId;
@@ -16,11 +35,67 @@ public class TileLayerData {
         this.temperatureMatrix = temperatureMatrix;
     }
 
+    // Costruttore che contiene la saturazione (output di Q1)
+    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount) {
+        this.batchId = batchId;
+        this.printId = printId;
+        this.tileId = tileId;
+        this.layerId = layerId;
+        this.temperatureMatrix = temperatureMatrix;
+        this.saturatedCount = saturatedCount; 
+    }
+
+    // Costruttore che contiene saturazione (output di Q1) e outlierPoints (output di Q2)
+    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount,
+                        String p1, String dp1, String p2, String dp2,
+                        String p3, String dp3, String p4, String dp4,
+                        String p5, String dp5,
+                        List<OutlierPoint> outlierPoints) {
+        this.batchId = batchId;
+        this.printId = printId;
+        this.tileId = tileId;
+        this.layerId = layerId;
+        this.temperatureMatrix = temperatureMatrix;
+        this.saturatedCount = saturatedCount; 
+        this.p1 = p1; this.dp1 = dp1;
+        this.p2 = p2; this.dp2 = dp2;
+        this.p3 = p3; this.dp3 = dp3;
+        this.p4 = p4; this.dp4 = dp4;
+        this.p5 = p5; this.dp5 = dp5;
+        this.outlierPoints = outlierPoints;
+    }
+
+    // Costruttore che contiene saturazione (output di Q1), outlierPoints (output di Q2) e clusters (output di Q3)
+    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount,
+                        String p1, String dp1, String p2, String dp2,
+                        String p3, String dp3, String p4, String dp4,
+                        String p5, String dp5,
+                        List<OutlierPoint> outlierPoints,
+                        List<Cluster> clusters) {
+        this.batchId = batchId;
+        this.printId = printId;
+        this.tileId = tileId;
+        this.layerId = layerId;
+        this.temperatureMatrix = temperatureMatrix;
+        this.saturatedCount = saturatedCount; 
+        this.p1 = p1; this.dp1 = dp1;
+        this.p2 = p2; this.dp2 = dp2;
+        this.p3 = p3; this.dp3 = dp3;
+        this.p4 = p4; this.dp4 = dp4;
+        this.p5 = p5; this.dp5 = dp5;
+        this.outlierPoints = outlierPoints;
+        this.clusters = clusters;
+    }
+
+
     @Override
     public String toString() {
         int height = temperatureMatrix.length;
         int width = temperatureMatrix[0].length;
-        return String.format("TileLayerData[batch=%s, print=%s, tile=%s, layer=%d, dimensions=%dx%d]", 
-            batchId, printId, tileId, layerId, width, height);
+        return String.format("TileLayerData[batch=%s, print=%s, tile=%s, layer=%d, dimensions=%dx%d, saturated=%d]", 
+            batchId, printId, tileId, layerId, width, height, saturatedCount);
     }
+
+
+
 }

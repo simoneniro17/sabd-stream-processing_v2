@@ -1,7 +1,6 @@
 package it.flink.processing;
 
 import it.flink.model.TileLayerData;
-import it.flink.model.SaturationResult;
 
 
 /**
@@ -15,7 +14,7 @@ public class Query1 {
      * - < 5000: aree vuote (da escludere dalle analisi successive)
      * - > 65000: punti saturati (da conteggiare ed escludere dalle analisi successive)
      */
-    public static SaturationResult analyzeSaturation(TileLayerData tile) {
+    public static TileLayerData analyzeSaturation(TileLayerData tile) {
         int saturatedCount = 0;
         int[][] matrix = tile.temperatureMatrix;
         int height = matrix.length;
@@ -30,6 +29,13 @@ public class Query1 {
                 }
             }
         }
-        return new SaturationResult(tile, saturatedCount);
+        return new TileLayerData(
+            tile.batchId,
+            tile.printId,
+            tile.tileId,
+            tile.layerId,
+            tile.temperatureMatrix,
+            saturatedCount
+        );
     }
 }
