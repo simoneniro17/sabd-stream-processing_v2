@@ -2,10 +2,11 @@ import argparse
 import os
 import csv
 from datetime import datetime
-import requests; 
+import requests
 from kafka import KafkaConsumer, TopicPartition
 import json
-from convert_to_json import csv_cluster_to_jsonl
+from convert_to_json import csv_cluster_to_jsonl  # Nota: usa csv_cluster_to_jsonl, non csv_cluster_to_json
+import time
 
 
 def main():
@@ -14,7 +15,7 @@ def main():
     parser.add_argument("--topic", required=True, help="Nome del topic Kafka da consumare")
     parser.add_argument("--bench_topic", required=True, help="Topic che contiene l'ID del bench")
     parser.add_argument("--broker", default="kafka:9092", help="Indirizzo del broker Kafka (default: kafka:9092)")
-    parser.add_argument("--api_url", help="URL del local challenger")
+    parser.add_argument("--api_url", default="http://gc-challenger:8866", help="URL del local challenger")
     args = parser.parse_args()
     topic = args.topic
     broker = args.broker
@@ -27,61 +28,56 @@ def main():
 
     print(f"[INFO] Connessione a Kafka su '{broker}' e ascolto del topic '{topic}'...")
 
-    # === CONFIGURA IL CONSUMER KAFKA ===
-    consumer = KafkaConsumer(
+    # === RECUPERA IL BENCH_ID DA KAFKA ===
+    bench_consumer = KafkaConsumer(
         bootstrap_servers=[broker],
-        auto_offset_reset='latest',
-        enable_auto_commit=False,
-        value_deserializer=lambda m: m.decode('utf-8'),
-        consumer_timeout_ms=1000
+        auto_offset_reset='earliest',
+        value_deserializer=lambda m: m.decode('utf-8')
     )
 
-    # === OTTIENI LE PARTIZIONI DEL TOPIC ===
-    partitions = consumer.partitions_for_topic(topic)
-    if partitions is None:
-        print(f"[ERRORE] Il topic '{topic}' non esiste o è vuoto.")
+    bench_id = None
+    bench_id_partition = bench_consumer.partitions_for_topic(bench_topic)
+    if bench_id_partition:
+        topic_partitions = [TopicPartition(bench_topic, p) for p in bench_id_partition]
+        bench_consumer.assign(topic_partitions)
+        
+        # Cerca l'ultimo messaggio
+        for tp in topic_partitions:
+            end_offset = bench_consumer.end_offsets([tp])[tp]
+            if end_offset > 0:
+                bench_consumer.seek(tp, end_offset - 1)
+                
+                msg_pack = bench_consumer.poll(timeout_ms=1000)
+                for _, msgs in msg_pack.items():
+                    for message in msgs:
+                        bench_id = message.value.strip()
+                        break
+    
+    bench_consumer.close()
+
+    if not bench_id:
+        print(f"[ERRORE] Impossibile leggere il bench_id dal topic '{bench_topic}'.")
         return
+    
+    print(f"[INFO] Letto bench_id dal topic '{bench_topic}': {bench_id}")
 
-    topic_partitions = [TopicPartition(topic, p) for p in partitions]
-    consumer.assign(topic_partitions)
+    # === CONFIGURA IL CONSUMER KAFKA E LA SESSIONE HTTP ===
+    consumer = KafkaConsumer(
+        topic,
+        bootstrap_servers=[broker],
+        auto_offset_reset='earliest',
+        group_id=f"result-consumer-{datetime.now().timestamp()}",
+        value_deserializer=lambda m: m.decode('utf-8')
+    )
 
-    # === CALCOLO DEGLI END OFFSETS ===
-    # Gli end offsets rappresentano il "limite superiore": non vogliamo leggere oltre questi,
-    # perché significherebbe leggere messaggi che arriveranno DOPO la nostra richiesta.
-    end_offsets = consumer.end_offsets(topic_partitions)
-
-
-    # === POSIZIONA IL CONSUMER ALL'INIZIO DELLA PARTIZIONE ===
-    # In questo modo leggiamo TUTTI i messaggi dalla partizione, fino al limite stabilito sopra.
-    for tp in topic_partitions:
-        consumer.seek(tp, 0)
-
-    records = []
-
-    # === LEGGI I MESSAGGI FINO AGLI OFFSET FINALI ===
-    for tp in topic_partitions:
-        end_offset = end_offsets[tp]
-        while consumer.position(tp) < end_offset:
-            msg_pack = consumer.poll(timeout_ms=100)
-            for _, msgs in msg_pack.items():
-                for message in msgs:
-                    line = message.value.strip()
-                    if not line:
-                        continue
-                    row = line.split(',')
-                    if len(row) == 0:
-                        continue
-                    records.append(row)
-
-    if not records:
-        print("[INFO] Nessun nuovo messaggio da scrivere.")
-        return
-
+    session = requests.Session()
+    
     # === CREA IL NOME DEL FILE CON TIMESTAMP ===
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     topic_name = topic.replace("-results", "")
     filename = f"{topic_name}_{timestamp}.csv"
     output_file = os.path.join(output_dir, filename)
+    jsonl_file = output_file.replace(".csv", ".jsonl")
 
     print(f"[INFO] Scrittura su: {output_file}")
     with open(output_file, mode='w', newline='') as csvfile:
@@ -90,83 +86,98 @@ def main():
         # Aggiunta header in base al topic che stiamo considerando (ovvero in base alla query)
         if "query1" in topic:
             header = ["seq_id", "print_id", "tile_id", "saturated"]
-            writer.writerow(header)
         elif "query2" in topic:
             header = ["seq_id", "print_id", "tile_id", "P1", "dP1", "P2", "dP2", "P3", "dP3", "P4", "dP4", "P5", "dP5"]
-            writer.writerow(header)
         elif "query3" in topic: 
             header = ["seq_id", "print_id", "tile_id", "saturated", "centroids"]
-            writer.writerow(header)
-        else:
-            pass
+        writer.writerow(header)
 
-        for row in records:
-            writer.writerow(row)
+    batch_processed = set()  # Per evitare duplicati
+    print(f"[INFO] Inizio elaborazione continua. Output su: {output_file}")
 
-    print(f"[INFO] Completato. Salvati {len(records)} record nel file '{filename}'.")
+    # Flag per capire se abbiamo finito il processing
+    all_data_processed = False
+    last_message_time = datetime.now()
+    
+    # Accumulatore per i messaggi
+    all_records = []
 
+    try:
+        # Impostiamo un timeout di polling più lungo per attendere i messaggi
+        while not all_data_processed:
+            # Poll dei messaggi
+            message_batch = consumer.poll(timeout_ms=200)
+            
+            if message_batch:
+                # Resettiamo il timer perché abbiamo ricevuto messaggi
+                last_message_time = datetime.now()
+                
+                for _, messages in message_batch.items():
+                    for message in messages:
+                        record = message.value.strip()
+                        if not record:
+                            continue
 
-    # === INVIA I RISULTATI AL LOCAL CHALLNGER ===
-    # Se siamo in query3 dobbiamo inviare i risultati al LOCAL CHALLNGER
-    if "query3" in topic:
+                        row = record.split(",")
+                        if len(row) < 3:  # Minimo deve avere seq_id, print_id, tile_id
+                            continue
 
-        # Trasformiamo il csv di out in jsonl (linee di file json)
-        jsonl_file = None
+                        batch_id = row[0]
+                        all_records.append(row)
+                        
+                        # Scrivi ogni record nel file CSV
+                        with open(output_file, mode='a', newline='') as csvfile:
+                            writer = csv.writer(csvfile)
+                            writer.writerow(row)
 
-        jsonl_file = output_file.replace(".csv", ".jsonl")
-        num_jsonl = csv_cluster_to_jsonl(output_file, jsonl_file)
-        print(f"[INFO] File JSONL creato: {jsonl_file} con {num_jsonl} record.")
-
-        # Leggi il bench_id da kafka
-        bench_id_partition = consumer.partitions_for_topic(bench_topic)
-        if not bench_id_partition:
-            raise RuntimeError(f"Nessuna partizione trovata per il topic '{bench_topic}'.")
-
-        topic_partitions = [TopicPartition(bench_topic, p) for p in bench_id_partition]
-        consumer.assign(topic_partitions)
-
-        # Vai all'ultimo offset - 1 per leggere l'ultimo messaggio
-        for tp in topic_partitions:
-            end_offset = consumer.end_offsets([tp])[tp]
-            if end_offset == 0:
-                raise RuntimeError(f"Nessun messaggio presente nel topic '{bench_topic}'.")
-            consumer.seek(tp, end_offset - 1)
-
-        bench_id = None
-        msg_pack = consumer.poll(timeout_ms=500)
-        for _, msgs in msg_pack.items():
-            for message in msgs:
-                bench_id = message.value.strip()
-                break
-
-        if not bench_id:
-            raise RuntimeError("Impossibile leggere il bench_id dal topic Kafka.")
+                        if "query3" in topic and batch_id not in batch_processed:
+                            try:
+                                # Converti CSV in JSONL (un JSON per riga)
+                                csv_cluster_to_jsonl(output_file, jsonl_file)
+                                
+                                # Trova la riga corrispondente al batch_id
+                                batch_entry = None
+                                with open(jsonl_file, "r", encoding="utf-8") as f:
+                                    for line in f:
+                                        entry = json.loads(line)
+                                        if str(entry["batch_id"]) == str(batch_id):
+                                            batch_entry = entry
+                                            break
+                                
+                                if batch_entry:
+                                    # Invia il risultato
+                                    response = session.post(
+                                        f"{api_url}/api/result/0/{bench_id}/{batch_id}", 
+                                        json=batch_entry
+                                    )
+                                    print(f"[INFO] Risultato per batch {batch_id} inviato: {response.status_code}")
+                                    batch_processed.add(batch_id)
+                            except Exception as e:
+                                print(f"[ERRORE] Elaborazione batch {batch_id} fallita: {str(e)}")
+            else:
+                # Se sono passati più di 10 secondi senza messaggi, consideriamo il processing completato
+                if (datetime.now() - last_message_time).total_seconds() > 10:
+                    print("[INFO] Nessun messaggio ricevuto per 10 secondi, presumo che abbiamo finito")
+                    all_data_processed = True
+            
+            # Breve pausa per non sovraccaricare la CPU
+            time.sleep(0.1)
+                
+    except KeyboardInterrupt:
+        print("[INFO] Elaborazione interrotta dall'utente")
+    except Exception as e:
+        print(f"[ERRORE] Si è verificato un errore: {e}")
+    finally:
+        consumer.close()
         
-        print(f"[INFO] Letto bench_id dal topic '{bench_topic}': {bench_id}")
+        print(f"[INFO] Totale record elaborati: {len(all_records)}")
 
-        # Invia il  messaggio al local challenger
-        session = requests.Session()
-        with open(jsonl_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    payload = json.loads(line)
-                    batch_id = payload["batch_id"]
-                    response = session.post(f"{api_url}/api/result/0/{bench_id}/{batch_id}", json={
-                        "batch_id": batch_id,
-                        "status": "processed"
-                    })
-                    response.raise_for_status()
-                    print(f"[INFO] Batch {batch_id} inviato con successo.")
-                except Exception as e:
-                    print(f"[ERRORE] Invio fallito per batch: {e}")
-
+        print("[INFO] Chiusura del benchmark...")
         try:
             end_resp = session.post(f"{api_url}/api/end/{bench_id}")
-            end_resp.raise_for_status()
-            result = end_resp.text
-            print(f"[INFO] Benchmark {bench_id} terminato con successo. Risultati: {result}")
+            print(f"[INFO] Benchmark {bench_id} terminato. Risposta: {end_resp.text}")
         except Exception as e:
-            print(f"[ERRORE] Chiusura benchmark fallita: {e}") 
+            print(f"[ERRORE] Errore durante la chiusura del benchmark: {e}")
 
 
 if __name__ == "__main__":
