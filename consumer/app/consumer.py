@@ -1,6 +1,7 @@
 import argparse
 import os
 import csv
+from datetime import datetime
 from kafka import KafkaConsumer, TopicPartition
 
 def main():
@@ -13,7 +14,7 @@ def main():
     broker = args.broker
 
     # === CREA CARTELLA DI OUTPUT SE NON ESISTE ===
-    output_dir = "/output"
+    output_dir = "/results"
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"[INFO] Connessione a Kafka su '{broker}' e ascolto del topic '{topic}'...")
@@ -48,7 +49,6 @@ def main():
         consumer.seek(tp, 0)
 
     records = []
-    batch_ids = []
 
     # === LEGGI I MESSAGGI FINO AGLI OFFSET FINALI ===
     for tp in topic_partitions:
@@ -63,40 +63,30 @@ def main():
                     row = line.split(',')
                     if len(row) == 0:
                         continue
-                    try:
-                        batch_id = int(row[0])
-                        batch_ids.append(batch_id)
-                    except ValueError:
-                        print(f"[WARN] batch_id non valido in: {row}")
-                        continue
                     records.append(row)
 
     if not records:
         print("[INFO] Nessun nuovo messaggio da scrivere.")
         return
 
-    # === CREA IL NOME DEL FILE BASATO SUL RANGE DI BATCH_ID ===
-    min_id = min(batch_ids)
-    max_id = max(batch_ids)
-    filename = f"{topic}_{min_id}-{max_id}.csv"
+    # === CREA IL NOME DEL FILE CON TIMESTAMP ===
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    topic_name = topic.replace("-results", "")
+    filename = f"{topic_name}_{timestamp}.csv"
     output_file = os.path.join(output_dir, filename)
-
-    if os.path.exists(output_file):
-        print(f"[INFO] Il file '{filename}' esiste già. Nessuna sovrascrittura eseguita.")
-        return
 
     print(f"[INFO] Scrittura su: {output_file}")
     with open(output_file, mode='w', newline='') as csvfile:
         writer = csv.writer(csvfile)
 
         # Aggiunta header in base al topic che stiamo considerando (ovvero in base alla query)
-        if "saturation" in topic:
+        if "query1" in topic:
             header = ["seq_id", "print_id", "tile_id", "saturated"]
             writer.writerow(header)
-        elif "outlier" in topic:
+        elif "query2" in topic:
             header = ["seq_id", "print_id", "tile_id", "P1", "dP1", "P2", "dP2", "P3", "dP3", "P4", "dP4", "P5", "dP5"]
             writer.writerow(header)
-        elif "cluster" in topic: 
+        elif "query3" in topic: 
             header = ["seq_id", "print_id", "tile_id", "saturated", "centroids"]
             writer.writerow(header)
         else:
@@ -109,9 +99,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-#il container consumer resta sempre attivo, per richiedere i risultati eseguire questo comando:
-
-#docker exec consumer python /app/consumer.py --topic saturation-results-topic
-
-#salverà il file CSV nella cartella output con il nome del topic e i batch contenenti al momento della richiesta.

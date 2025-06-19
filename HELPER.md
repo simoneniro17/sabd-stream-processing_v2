@@ -17,5 +17,5 @@ flink run --jobmanager jobmanager:8081 -c it.flink.StreamingJob /opt/flink/jobs/
 
 Per leggere i risultati da Kafka
 ```bash
-docker exec consumer python /app/consumer.py --topic [saturation-results-topic|outlier-results-topic]
+docker exec consumer python /app/consumer.py --topic queryN-results
 ```

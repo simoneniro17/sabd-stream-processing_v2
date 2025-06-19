@@ -27,9 +27,9 @@ public class StreamingJob {
     // Configurazione Kafka
     private static final String KAFKA_BOOTSTRAP_SERVER = "kafka:9092";
     private static final String INPUT_TOPIC = "gc-batches";
-    private static final String SATURATION_OUTPUT_TOPIC = "saturation-results-topic";
-    private static final String OUTLIER_OUTPUT_TOPIC = "outlier-results-topic";
-    private static final String CLUSTER_OUTPUT_TOPIC = "cluster-results-topic";
+    private static final String SATURATION_OUTPUT_TOPIC = "query1-results";
+    private static final String OUTLIER_OUTPUT_TOPIC = "query2-results";
+    private static final String CLUSTER_OUTPUT_TOPIC = "query3-results";
 
     public static void main(String[] args) throws Exception {
         // Definiamo l'ambiente di esecuzione

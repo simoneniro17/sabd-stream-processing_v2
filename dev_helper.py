@@ -18,7 +18,7 @@ LOCAL_JAR_PATH = os.path.join("flink", "target", FLINK_JAR_NAME)
 CONTAINER_JAR_PATH = "/opt/flink/jobs/flink-1.0-SNAPSHOT.jar"
 FLINK_JOB_CLASS = "it.flink.StreamingJob"
 CONSUMER_SCRIPT = "/app/consumer.py"
-KAFKA_TOPICS = ["saturation-results-topic", "outlier-results-topic", "cluster-results-topic"]
+KAFKA_TOPICS = ["query1-results", "query2-results", "query3-results"]
 SERVICE_START_WAIT = 20  # Secondi di attesa dopo l'avvio dei servizi
 
 def run_command(command: List[str], cwd=None) -> bool:
