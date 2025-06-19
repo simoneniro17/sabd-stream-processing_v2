@@ -90,12 +90,22 @@ public class TileLayerData {
 
     @Override
     public String toString() {
-        int height = temperatureMatrix.length;
-        int width = temperatureMatrix[0].length;
-        return String.format("TileLayerData[batch=%s, print=%s, tile=%s, layer=%d, dimensions=%dx%d, saturated=%d]", 
-            batchId, printId, tileId, layerId, width, height, saturatedCount);
-    }
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("INFO:demo_client:Processing layer %d of print %s, tile %s\n", layerId, printId, tileId));
+        sb.append(String.format("{'batch_id': %s, 'print_id': '%s', 'tile_id': %s, 'saturated': %d, 'centroids': [\n",
+            batchId, printId, tileId, saturatedCount));
 
+        if (clusters != null && !clusters.isEmpty()) {
+            for (int i = 0; i < clusters.size(); i++) {
+                Cluster c = clusters.get(i);
+                sb.append(String.format(" {'x': np.float64(%.15f), 'y': np.float64(%.15f), 'count': %d}",
+                    c.getCentroidX(), c.getCentroidY(), c.getCount()));
+                if (i < clusters.size() - 1) sb.append(",\n");
+            }
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
 
 
 }

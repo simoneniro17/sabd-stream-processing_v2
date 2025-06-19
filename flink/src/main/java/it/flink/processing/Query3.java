@@ -16,8 +16,8 @@ import smile.math.distance.Distance;
 
 public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
     
-    private final double EPSILON = 5.0;
-    private final int MINPTS = 3;
+    private final double EPSILON = 20;
+    private final int MINPTS = 5;
 
     @Override
     public TileLayerData map(TileLayerData tileLayerStream) throws Exception {
@@ -60,11 +60,13 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
         // Esegui DBSCAN sui dati
         DBSCAN<double[]> dbscan = DBSCAN.fit(data, dist, MINPTS, EPSILON);
 
+
+        int [] labels=dbscan.y;
         // Ottieni etichette cluster per ogni punto
-        int[] labels = new int[data.length];
-        for (int i = 0; i < data.length; i++) {
-            labels[i] = dbscan.predict(data[i]);
-        }
+        // int[] labels = new int[data.length];
+        // for (int i = 0; i < data.length; i++) {
+        //     labels[i] = dbscan.predict(data[i]);
+        // }
 
         // Raggruppa i punti per cluster escludendo i rumori (-1)
         Map<Integer, List<OutlierPoint>> clustersMap = new HashMap<>();
@@ -74,12 +76,13 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
             clustersMap.computeIfAbsent(label, k -> new ArrayList<>()).add(points.get(i));
         }
 
-        // Crea lista di cluster come oggetti Cluster
         List<Cluster> clusters = new ArrayList<>();
-        for (List<OutlierPoint> clusterPoints : clustersMap.values()) {
-            Cluster c = new Cluster(clusterPoints);
-            clusters.add(c);
-        }
+        for (List<OutlierPoint> pts : clustersMap.values()) {
+
+            // andiamo a filtrare i  cluster troppo piccoli (meno di MINPTS punti) per evitare rumore o gruppi non significativi
+            if (pts.size() < MINPTS) continue;
+            clusters.add(new Cluster(pts));
+}
 
         // Ritorna il risultato raggruppato
         return new TileLayerData(

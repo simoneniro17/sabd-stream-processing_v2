@@ -51,6 +51,7 @@ public class StreamingJob {
 
         // Esecuzione Query 3
         tileLayerStream = processQuery3(tileLayerStream);
+        tileLayerStream.print("Query 3 - Outlier Results");
 
         // Esecuzione del job
         env.execute("StreamingJob");
