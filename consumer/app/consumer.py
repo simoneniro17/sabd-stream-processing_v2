@@ -160,6 +160,14 @@ def main():
                 except Exception as e:
                     print(f"[ERRORE] Invio fallito per batch: {e}")
 
+        try:
+            end_resp = session.post(f"{api_url}/api/end/{bench_id}")
+            end_resp.raise_for_status()
+            result = end_resp.text
+            print(f"[INFO] Benchmark {bench_id} terminato con successo. Risultati: {result}")
+        except Exception as e:
+            print(f"[ERRORE] Chiusura benchmark fallita: {e}") 
+
 
 if __name__ == "__main__":
     main()

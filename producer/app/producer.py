@@ -101,10 +101,10 @@ def main():
             print(f"Prodotto batch {i} su Kafka.")
 
             # Risultato fittizio al challenger, soltanto per evitare che il producer crashi quando finisce
-            result_resp = session.post(
-                f"{API_URL}/api/result/0/{bench_id}/{i}",
-                json={"batch_id": i, "status": "processed"}
-            )
+            # result_resp = session.post(
+            #     f"{API_URL}/api/result/0/{bench_id}/{i}",
+            #     json={"batch_id": i, "status": "processed"}
+            # )
 
             i += 1
     except KeyboardInterrupt:
@@ -112,10 +112,10 @@ def main():
     except Exception as e:
         print(f"Errore durante la produzione: {e}")
     finally:
-        # === FINE DELLA SESSIONE DI BENCHMARK ===
-        end_resp = session.post(f"{API_URL}/api/end/{bench_id}")
-        end_resp.raise_for_status()
-        print("Sessione di benchmark terminata.")
+        # # === FINE DELLA SESSIONE DI BENCHMARK ===
+        # end_resp = session.post(f"{API_URL}/api/end/{bench_id}")
+        # end_resp.raise_for_status()
+        # print("Sessione di benchmark terminata.")
 
         # Chiusura del producer
         if producer:

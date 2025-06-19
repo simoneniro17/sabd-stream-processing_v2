@@ -32,6 +32,22 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
         // Verifichiamo che ci siano i tre layer necessari per l'analisi
         if (layers.size() < WINDOW_SIZE) {
             System.out.println("Dati insufficienti per " + key + ". Richiesti: " + WINDOW_SIZE + ", trovati: " + layers.size());
+
+            TileLayerData currentLayer = layers.get(layers.size() - 1);
+        
+            // Output vuoto
+            TileLayerData emptyResult = new TileLayerData(
+                currentLayer.batchId,
+                currentLayer.printId,
+                currentLayer.tileId,
+                currentLayer.layerId,
+                currentLayer.temperatureMatrix,
+                currentLayer.saturatedCount,
+                "()", "", "()", "", "()", "", "()", "", "()", "",
+                Collections.emptyList() // Lista vuota di outlier
+            );
+
+            out.collect(emptyResult);
             return;
         }
 
