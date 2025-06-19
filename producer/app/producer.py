@@ -7,7 +7,8 @@ from kafka import KafkaProducer
 
 # === CONFIG ===
 KAFKA_BROKER = 'kafka:9092'
-TOPIC_NAME = 'gc-batches'
+BATCHES_TOPIC = 'gc-batches'
+BENCH_TOPIC = 'gc-bench'
 API_URL = 'http://gc-challenger:8866'
 MAX_RETRIES = 10
 WAIT_TIME = 3   # tempo di attesa (s) tra i tentativi di connessione
@@ -73,6 +74,11 @@ def main():
     print("Avvio benchmark...")
     start_resp = session.post(f"{API_URL}/api/start/{bench_id}")
 
+    # Produzione del messaggio con il Benchmark ID su Kafka
+    producer.send(BENCH_TOPIC, value=bench_id.encode('utf-8'))
+    producer.flush()
+    print(f"Prodotto Benchmark ID su Kafka.")
+
     # === PRODUZIONE DEI BATCH ===
     i = 0
     try:
@@ -89,8 +95,8 @@ def main():
                 break
             batch_resp.raise_for_status()
 
-            # Produzione del messaggio su Kafka
-            producer.send(TOPIC_NAME, value=batch_resp.content)
+            # Produzione del messaggio con i batch su Kafka
+            producer.send(BATCHES_TOPIC, value=batch_resp.content)
             producer.flush()    # Ci assicuriamo che il messaggio sia stato inviato prima di continuare
             print(f"Prodotto batch {i} su Kafka.")
 

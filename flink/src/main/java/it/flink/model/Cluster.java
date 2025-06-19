@@ -27,6 +27,6 @@ public class Cluster {
 
     @Override
     public String toString() {
-        return String.format("Cluster[count=%d, x=%.2f, y=%.2f]", getCount(), getCentroidY(), getCentroidX());
+        return String.format("{'x': %.2f; 'y': %.2f; 'count': %d}", getCentroidY(), getCentroidX(), getCount());
     }
 }

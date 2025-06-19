@@ -2,16 +2,24 @@ import argparse
 import os
 import csv
 from datetime import datetime
+import requests; 
 from kafka import KafkaConsumer, TopicPartition
+import json
+from convert_to_json import csv_cluster_to_jsonl
+
 
 def main():
     # === PARSING DEGLI ARGOMENTI DA RIGA DI COMANDO ===
     parser = argparse.ArgumentParser(description="Kafka Consumer per salvare i messaggi in CSV")
     parser.add_argument("--topic", required=True, help="Nome del topic Kafka da consumare")
+    parser.add_argument("--bench_topic", required=True, help="Topic che contiene l'ID del bench")
     parser.add_argument("--broker", default="kafka:9092", help="Indirizzo del broker Kafka (default: kafka:9092)")
+    parser.add_argument("--api_url", help="URL del local challenger")
     args = parser.parse_args()
     topic = args.topic
     broker = args.broker
+    api_url = args.api_url
+    bench_topic = args.bench_topic
 
     # === CREA CARTELLA DI OUTPUT SE NON ESISTE ===
     output_dir = "/results"
@@ -96,6 +104,62 @@ def main():
             writer.writerow(row)
 
     print(f"[INFO] Completato. Salvati {len(records)} record nel file '{filename}'.")
+
+
+    # === INVIA I RISULTATI AL LOCAL CHALLNGER ===
+    # Se siamo in query3 dobbiamo inviare i risultati al LOCAL CHALLNGER
+    if "query3" in topic:
+
+        # Trasformiamo il csv di out in jsonl (linee di file json)
+        jsonl_file = None
+
+        jsonl_file = output_file.replace(".csv", ".jsonl")
+        num_jsonl = csv_cluster_to_jsonl(output_file, jsonl_file)
+        print(f"[INFO] File JSONL creato: {jsonl_file} con {num_jsonl} record.")
+
+        # Leggi il bench_id da kafka
+        bench_id_partition = consumer.partitions_for_topic(bench_topic)
+        if not bench_id_partition:
+            raise RuntimeError(f"Nessuna partizione trovata per il topic '{bench_topic}'.")
+
+        topic_partitions = [TopicPartition(bench_topic, p) for p in bench_id_partition]
+        consumer.assign(topic_partitions)
+
+        # Vai all'ultimo offset - 1 per leggere l'ultimo messaggio
+        for tp in topic_partitions:
+            end_offset = consumer.end_offsets([tp])[tp]
+            if end_offset == 0:
+                raise RuntimeError(f"Nessun messaggio presente nel topic '{bench_topic}'.")
+            consumer.seek(tp, end_offset - 1)
+
+        bench_id = None
+        msg_pack = consumer.poll(timeout_ms=500)
+        for _, msgs in msg_pack.items():
+            for message in msgs:
+                bench_id = message.value.strip()
+                break
+
+        if not bench_id:
+            raise RuntimeError("Impossibile leggere il bench_id dal topic Kafka.")
+        
+        print(f"[INFO] Letto bench_id dal topic '{bench_topic}': {bench_id}")
+
+        # Invia il  messaggio al local challenger
+        session = requests.Session()
+        with open(jsonl_file, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    payload = json.loads(line)
+                    batch_id = payload["batch_id"]
+                    response = session.post(f"{api_url}/api/result/0/{bench_id}/{batch_id}", json={
+                        "batch_id": batch_id,
+                        "status": "processed"
+                    })
+                    response.raise_for_status()
+                    print(f"[INFO] Batch {batch_id} inviato con successo.")
+                except Exception as e:
+                    print(f"[ERRORE] Invio fallito per batch: {e}")
+
 
 if __name__ == "__main__":
     main()

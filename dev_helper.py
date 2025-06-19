@@ -19,6 +19,8 @@ CONTAINER_JAR_PATH = "/opt/flink/jobs/flink-1.0-SNAPSHOT.jar"
 FLINK_JOB_CLASS = "it.flink.StreamingJob"
 CONSUMER_SCRIPT = "/app/consumer.py"
 KAFKA_TOPICS = ["query1-results", "query2-results", "query3-results"]
+BENCH_TOPIC = "gc-bench"
+API_URL = 'http://gc-challenger:8866'
 SERVICE_START_WAIT = 20  # Secondi di attesa dopo l'avvio dei servizi
 
 def run_command(command: List[str], cwd=None) -> bool:
@@ -86,7 +88,9 @@ def read_kafka_topics(topics=None) -> bool:
         command = [
             "docker", "exec", "consumer",
             "python", CONSUMER_SCRIPT,
-            "--topic", topic
+            "--topic", topic,
+            "--bench_topic", BENCH_TOPIC,
+            "--api_url", API_URL
         ]
         if not run_command(command):
             success = False

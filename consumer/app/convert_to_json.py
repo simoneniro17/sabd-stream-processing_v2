@@ -1,7 +1,4 @@
-import csv
-import os
 import re
-import numpy as np  # solo per stampare np.float64
 import json
 
 #  Regex robusta → Cluster[count=87, x=498.26, y=129.25]
