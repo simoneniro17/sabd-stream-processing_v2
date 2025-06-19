@@ -74,12 +74,6 @@ under the License.
 		</dependency>
 
 		<dependency>
-			<groupId>com.github.haifengl</groupId>
-			<artifactId>smile-core</artifactId>
-			<version>2.6.0</version>
-		</dependency>
-
-		<dependency>
 			<groupId>com.twelvemonkeys.imageio</groupId>
 			<artifactId>imageio-tiff</artifactId>
 			<version>3.8.1</version>

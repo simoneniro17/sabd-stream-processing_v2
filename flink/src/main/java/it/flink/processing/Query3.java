@@ -10,9 +10,8 @@ import org.apache.flink.api.common.functions.MapFunction;
 
 import it.flink.model.OutlierPoint;
 import it.flink.model.TileLayerData;
+import it.flink.utils.CustomDBSCAN;
 import it.flink.model.Cluster;
-import smile.clustering.DBSCAN;
-import smile.math.distance.Distance;
 
 public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
     
@@ -42,6 +41,11 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
         );
         }
 
+        Collections.sort(points, (p1, p2) -> 
+            // Ordina per coordinate x, poi y
+            Double.compare(p2.deviation, p1.deviation)
+        );
+
         // Prepara dati per DBSCAN (coordinate x,y)
         double[][] data = new double[points.size()][2];
         for (int i = 0; i < points.size(); i++) {
@@ -50,25 +54,11 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
             data[i][1] = p.y;
         }
 
-        // Definisce la distanza Euclidea per DBSCAN
-        Distance<double[]> dist = (a, b) -> {
-            double dx = a[0] - b[0];
-            double dy = a[1] - b[1];
-            return Math.sqrt(dx * dx + dy * dy);
-        };
-
         // Esegui DBSCAN sui dati
-        DBSCAN<double[]> dbscan = DBSCAN.fit(data, dist, MINPTS, EPSILON);
+        CustomDBSCAN dbscan = new CustomDBSCAN(EPSILON, MINPTS);
+        int [] labels = dbscan.fit(points);
 
-
-        int [] labels=dbscan.y;
-        // Ottieni etichette cluster per ogni punto
-        // int[] labels = new int[data.length];
-        // for (int i = 0; i < data.length; i++) {
-        //     labels[i] = dbscan.predict(data[i]);
-        // }
-
-        // Raggruppa i punti per cluster escludendo i rumori (-1)
+        // Raggruppa i punti per cluster escludendo i rumori
         Map<Integer, List<OutlierPoint>> clustersMap = new HashMap<>();
         for (int i = 0; i < labels.length; i++) {
             int label = labels[i];
@@ -78,11 +68,9 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
 
         List<Cluster> clusters = new ArrayList<>();
         for (List<OutlierPoint> pts : clustersMap.values()) {
-
             // andiamo a filtrare i  cluster troppo piccoli (meno di MINPTS punti) per evitare rumore o gruppi non significativi
-            if (pts.size() <= MINPTS) continue;
             clusters.add(new Cluster(pts));
-}
+        }
 
         // Ritorna il risultato raggruppato
         return new TileLayerData(
