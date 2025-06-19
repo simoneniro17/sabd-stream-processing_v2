@@ -35,6 +35,9 @@ public class TileLayerData {
         this.temperatureMatrix = temperatureMatrix;
     }
 
+
+    // ========================== COSTRUTTORI ===========================
+
     // Costruttore che contiene la saturazione (output di Q1)
     public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount) {
         this.batchId = batchId;

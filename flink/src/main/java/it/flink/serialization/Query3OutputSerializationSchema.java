@@ -17,7 +17,7 @@ public class Query3OutputSerializationSchema implements SerializationSchema<Tile
                 tileLayer.printId,
                 tileLayer.tileId,
                 tileLayer.saturatedCount,
-                tileLayer.clusters);
+                tileLayer.clusters.toString());
 
         return csv.getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }

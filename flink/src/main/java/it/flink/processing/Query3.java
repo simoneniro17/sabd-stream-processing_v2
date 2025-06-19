@@ -80,7 +80,7 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
         for (List<OutlierPoint> pts : clustersMap.values()) {
 
             // andiamo a filtrare i  cluster troppo piccoli (meno di MINPTS punti) per evitare rumore o gruppi non significativi
-            if (pts.size() < MINPTS) continue;
+            if (pts.size() <= MINPTS) continue;
             clusters.add(new Cluster(pts));
 }
 

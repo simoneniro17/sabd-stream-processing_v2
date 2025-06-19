@@ -96,9 +96,10 @@ def main():
         elif "outlier" in topic:
             header = ["seq_id", "print_id", "tile_id", "P1", "dP1", "P2", "dP2", "P3", "dP3", "P4", "dP4", "P5", "dP5"]
             writer.writerow(header)
+        elif "cluster" in topic: 
+            header = ["seq_id", "print_id", "tile_id", "saturated", "centroids"]
+            writer.writerow(header)
         else:
-            # ALTRI TOPIC
-            # TODO
             pass
 
         for row in records:

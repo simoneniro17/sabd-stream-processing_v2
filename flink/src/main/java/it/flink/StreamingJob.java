@@ -29,6 +29,7 @@ public class StreamingJob {
     private static final String INPUT_TOPIC = "gc-batches";
     private static final String SATURATION_OUTPUT_TOPIC = "saturation-results-topic";
     private static final String OUTLIER_OUTPUT_TOPIC = "outlier-results-topic";
+    private static final String CLUSTER_OUTPUT_TOPIC = "cluster-results-topic";
 
     public static void main(String[] args) throws Exception {
         // Definiamo l'ambiente di esecuzione
@@ -101,7 +102,7 @@ public class StreamingJob {
         tileLayerStream = tileLayerStream.map(new Query3());
 
         // Output Query 3 (scrittura su Kafka)
-        new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new Query3OutputSerializationSchema(), "Q3-sink-")
+        new KafkaResultPublisher<>(CLUSTER_OUTPUT_TOPIC, new Query3OutputSerializationSchema(), "Q3-sink-")
              .writeToKafka(tileLayerStream);
 
         return tileLayerStream;
