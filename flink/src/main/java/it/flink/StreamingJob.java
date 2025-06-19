@@ -15,6 +15,7 @@ import it.flink.serialization.Query1OutputSerializationSchema;
 import it.flink.serialization.Query3OutputSerializationSchema;
 import it.flink.utils.TileLayerExtractor;
 import it.flink.utils.KafkaResultPublisher;
+import it.flink.utils.KafkaTopicUtils;
 
 import java.util.Map;
 
@@ -36,6 +37,9 @@ public class StreamingJob {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         // TODO: se si vuole eseguire in parallelo su più task manager, impostare il parallelismo
         // env.setParallelism(2);
+
+        KafkaTopicUtils.waitForTopic(KAFKA_BOOTSTRAP_SERVER, INPUT_TOPIC, 1000);
+
 
         // Configurazione e creazione del DataStream dalla sorgente Kafka
         DataStream<Map<String, Object>> kafkaStream = createKafkaSource(env);
