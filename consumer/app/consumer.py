@@ -166,8 +166,8 @@ class KafkaResultConsumer:
                                 self._process_query3_result(batch_id, bench_id)
                 else:
                     # Se non ci sono messaggi per 10 secondi, termina
-                    if (datetime.now() - last_message_time).total_seconds() > 10:
-                        print("[INFO] Nessun messaggio ricevuto per 10 secondi, elaborazione completata")
+                    if (datetime.now() - last_message_time).total_seconds() > 30:
+                        print("[INFO] Nessun messaggio ricevuto per 30 secondi, elaborazione completata")
                         all_data_processed = True
                 
                 time.sleep(0.01)  # Pausa breve per non sovraccaricare la CPU

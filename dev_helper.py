@@ -1,27 +1,21 @@
-#!/usr/bin/env python3
-"""
-Script di automazione semplificato per il progetto SABD Stream Processing.
-"""
-
 import argparse
 import os
 import subprocess
 import time
-import webbrowser
 import sys
 from typing import List
 
 # Costanti
 FLINK_JAR_NAME = "flink-1.0-SNAPSHOT.jar"
 LOCAL_JAR_PATH = os.path.join("flink", "target", FLINK_JAR_NAME)
-# Il percorso al JAR nel container (attraverso il volume condiviso)
 CONTAINER_JAR_PATH = "/opt/flink/jobs/flink-1.0-SNAPSHOT.jar"
 FLINK_JOB_CLASS = "it.flink.StreamingJob"
+
 CONSUMER_SCRIPT = "/app/consumer.py"
-KAFKA_TOPICS = ["query1-results", "query2-results", "query3-results"]
+KAFKA_TOPICS = ["query3-results", "query1-results", "query2-results"]
 BENCH_TOPIC = "gc-bench"
 API_URL = 'http://gc-challenger:8866'
-SERVICE_START_WAIT = 20  # Secondi di attesa dopo l'avvio dei servizi
+SERVICE_START_WAIT = 15
 
 def run_command(command: List[str], cwd=None) -> bool:
     """Esegue un comando e restituisce True se è andato a buon fine"""
@@ -97,11 +91,6 @@ def read_kafka_topics(topics=None) -> bool:
     
     return success
 
-def open_flink_ui() -> None:
-    """Apre l'interfaccia web di Flink nel browser"""
-    webbrowser.open("http://localhost:8081")
-    print("Interfaccia web di Flink aperta nel browser")
-
 def main():
     parser = argparse.ArgumentParser(
         description="Automazione del flusso di sviluppo per il progetto SABD Stream Processing"
@@ -117,30 +106,18 @@ def main():
                        help="Invia il job Flink al JobManager")
     parser.add_argument("--read", action="store_true", 
                        help="Legge i dati dai topic Kafka")
-    parser.add_argument("--ui", action="store_true", 
-                       help="Apre l'interfaccia web di Flink")
     parser.add_argument("--topic", nargs='+', 
                        help="Specifica i topic da leggere (usato con --read)")
     
     args = parser.parse_args()
-    
-    if args.all or args.start:
-        start_services()
-    
+
     if args.all or args.build:
         build_flink_jar()
-    
-    # if args.all or args.deploy:
-    #     submit_flink_job()
-    
-    if args.ui:
-        open_flink_ui()
-        
+
+    if args.all or args.start:
+        start_services()
+
     if args.all or args.read:
-        # Se --all, attendi un po' per lasciare al job il tempo di produrre risultati
-        if args.all:
-            print("Attesa per la generazione dei risultati...")
-            time.sleep(5)
         read_kafka_topics(args.topic)
     
     print("Operazioni completate")
