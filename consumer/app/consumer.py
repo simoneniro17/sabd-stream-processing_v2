@@ -9,26 +9,19 @@ from convert_to_json import csv_cluster_to_jsonl  # Nota: usa csv_cluster_to_jso
 import time
 
 
-def main():
-    # === PARSING DEGLI ARGOMENTI DA RIGA DI COMANDO ===
-    parser = argparse.ArgumentParser(description="Kafka Consumer per salvare i messaggi in CSV")
-    parser.add_argument("--topic", required=True, help="Nome del topic Kafka da consumare")
-    parser.add_argument("--bench_topic", required=True, help="Topic che contiene l'ID del bench")
-    parser.add_argument("--broker", default="kafka:9092", help="Indirizzo del broker Kafka (default: kafka:9092)")
-    parser.add_argument("--api_url", default="http://gc-challenger:8866", help="URL del local challenger")
-    args = parser.parse_args()
-    topic = args.topic
-    broker = args.broker
-    api_url = args.api_url
-    bench_topic = args.bench_topic
+def wait_for_topic(bootstrap_servers, topic):
+    consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers)
+    print(f"[INFO] In attesa del topic '{topic}'...")
 
-    # === CREA CARTELLA DI OUTPUT SE NON ESISTE ===
-    output_dir = "/results"
-    os.makedirs(output_dir, exist_ok=True)
+    while True:
+        topics = consumer.topics()
+        if topic in topics:
+            print(f"[INFO] Topic '{topic}' trovato.")
+            consumer.close()
+            return
+        time.sleep(2)
 
-    print(f"[INFO] Connessione a Kafka su '{broker}' e ascolto del topic '{topic}'...")
-
-    # === RECUPERA IL BENCH_ID DA KAFKA ===
+def retrieve_bench_id(broker, bench_topic):
     bench_consumer = KafkaConsumer(
         bootstrap_servers=[broker],
         auto_offset_reset='earliest',
@@ -60,6 +53,33 @@ def main():
         return
     
     print(f"[INFO] Letto bench_id dal topic '{bench_topic}': {bench_id}")
+    return bench_id
+
+
+def main():
+    # === PARSING DEGLI ARGOMENTI DA RIGA DI COMANDO ===
+    parser = argparse.ArgumentParser(description="Kafka Consumer per salvare i messaggi in CSV")
+    parser.add_argument("--topic", required=True, help="Nome del topic Kafka da consumare")
+    parser.add_argument("--bench_topic", required=True, help="Topic che contiene l'ID del bench")
+    parser.add_argument("--broker", default="kafka:9092", help="Indirizzo del broker Kafka (default: kafka:9092)")
+    parser.add_argument("--api_url", default="http://gc-challenger:8866", help="URL del local challenger")
+    args = parser.parse_args()
+    topic = args.topic
+    broker = args.broker
+    api_url = args.api_url
+    bench_topic = args.bench_topic
+
+    # === CREA CARTELLA DI OUTPUT SE NON ESISTE ===
+    output_dir = "/results"
+    os.makedirs(output_dir, exist_ok=True)
+
+    print(f"[INFO] Connessione a Kafka su '{broker}' e ascolto del topic '{topic}'...")
+
+    wait_for_topic(broker, bench_topic)
+    wait_for_topic(broker, topic)
+    
+    # === RECUPERA IL BENCH_ID DA KAFKA ===
+    bench_id = retrieve_bench_id(broker,bench_topic)
 
     # === CONFIGURA IL CONSUMER KAFKA E LA SESSIONE HTTP ===
     consumer = KafkaConsumer(
@@ -90,6 +110,9 @@ def main():
             header = ["seq_id", "print_id", "tile_id", "P1", "dP1", "P2", "dP2", "P3", "dP3", "P4", "dP4", "P5", "dP5"]
         elif "query3" in topic: 
             header = ["seq_id", "print_id", "tile_id", "saturated", "centroids"]
+        else:
+            print(f"[ERRORE] Topic '{topic}' non riconosciuto. Specifica 'query1', 'query2' o 'query3'.")
+            return
         writer.writerow(header)
 
     batch_processed = set()  # Per evitare duplicati
@@ -173,11 +196,12 @@ def main():
         print(f"[INFO] Totale record elaborati: {len(all_records)}")
 
         print("[INFO] Chiusura del benchmark...")
-        try:
-            end_resp = session.post(f"{api_url}/api/end/{bench_id}")
-            print(f"[INFO] Benchmark {bench_id} terminato. Risposta: {end_resp.text}")
-        except Exception as e:
-            print(f"[ERRORE] Errore durante la chiusura del benchmark: {e}")
+        if "query3" in topic:
+            try:
+                end_resp = session.post(f"{api_url}/api/end/{bench_id}")
+                print(f"[INFO] Benchmark {bench_id} terminato. Risposta: {end_resp.text}")
+            except Exception as e:
+                print(f"[ERRORE] Errore durante la chiusura del benchmark: {e}")
 
 
 if __name__ == "__main__":
