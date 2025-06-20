@@ -5,6 +5,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+
 import it.flink.model.TileLayerData;
 import it.flink.processing.Query2;
 import it.flink.processing.Query3;
@@ -18,6 +19,8 @@ import it.flink.utils.KafkaResultPublisher;
 import it.flink.utils.KafkaTopicUtils;
 
 import java.util.Map;
+
+import it.flink.utils.KafkaWait;
 
 
 /**
@@ -37,7 +40,7 @@ public class StreamingJob {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         // TODO: se si vuole eseguire in parallelo su più task manager, impostare il parallelismo
         // env.setParallelism(2);
-
+        KafkaWait.waitForBroker("kafka", 9092, 1000);
         KafkaTopicUtils.waitForTopic(KAFKA_BOOTSTRAP_SERVER, INPUT_TOPIC, 1000);
 
 
