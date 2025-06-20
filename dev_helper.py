@@ -130,8 +130,8 @@ def main():
     if args.all or args.build:
         build_flink_jar()
     
-    if args.all or args.deploy:
-        submit_flink_job()
+    # if args.all or args.deploy:
+    #     submit_flink_job()
     
     if args.ui:
         open_flink_ui()

@@ -119,7 +119,8 @@ services:
       - taskmanager-2
     volumes:
       - ./flink/jobs:/opt/flink/jobs
-    entrypoint: ["tail", "-f", "/dev/null"]
+    command: >
+      flink run --jobmanager jobmanager:8081 -c it.flink.StreamingJob /opt/flink/jobs/flink-1.0-SNAPSHOT.jar
     environment:
       - |
         FLINK_PROPERTIES=
