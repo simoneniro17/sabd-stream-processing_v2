@@ -1,15 +1,17 @@
 import argparse
 import csv
 import os
+import re
 import json
 import time
+import requests
+
 from datetime import datetime
 
-import requests
 from kafka import KafkaConsumer, TopicPartition
 
-from convert_to_json import csv_cluster_to_jsonl
-
+# Regex per estrarre i centroidi
+CLUSTER_RGX = re.compile(r"\{'x': ([\d.]+); 'y': ([\d.]+); 'count': (\d+)\}")
 
 class KafkaResultConsumer:
     """Gestisce il consumo di messaggi Kafka, il salvataggio su file e l'invio dei risultati all'API."""
@@ -95,27 +97,30 @@ class KafkaResultConsumer:
         """Configura i file di output per CSV e JSONL."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         topic_name = self.topic.replace("-results", "")
-        filename = f"{topic_name}_{timestamp}.csv"
+
+        if self.query_type == "query3":     # Per la query 3 configuriamo solo il JSON
+            filename = f"{topic_name}_{timestamp}.jsonl"
+            self.jsonl_file = os.path.join(self.output_dir, filename)
+            print(f"[INFO] Scrittura su: {self.jsonl_file}")
+
+            return None, self.jsonl_file
+        else:   # Per le altre query configuriamo solo il CSV
+            filename = f"{topic_name}_{timestamp}.csv"
+            self.output_file = os.path.join(self.output_dir, filename)
+            print(f"[INFO] Scrittura su: {self.output_file}")    
         
-        self.output_file = os.path.join(self.output_dir, filename)
-        self.jsonl_file = self.output_file.replace(".csv", ".jsonl")
+            # Creazione e inizializzazione del file CSV con l'header appropriato
+            with open(self.output_file, mode='w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                
+                if self.query_type == "query1":
+                    header = ["seq_id", "print_id", "tile_id", "saturated"]
+                elif self.query_type == "query2":
+                    header = ["seq_id", "print_id", "tile_id", "P1", "dP1", "P2", "dP2", "P3", "dP3", "P4", "dP4", "P5", "dP5"]    
+                
+                writer.writerow(header)
         
-        print(f"[INFO] Scrittura su: {self.output_file}")
-        
-        # Crea e inizializza il file CSV con l'header appropriato
-        with open(self.output_file, mode='w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            
-            if self.query_type == "query1":
-                header = ["seq_id", "print_id", "tile_id", "saturated"]
-            elif self.query_type == "query2":
-                header = ["seq_id", "print_id", "tile_id", "P1", "dP1", "P2", "dP2", "P3", "dP3", "P4", "dP4", "P5", "dP5"]
-            elif self.query_type == "query3":
-                header = ["seq_id", "print_id", "tile_id", "saturated", "centroids"]
-            
-            writer.writerow(header)
-        
-        return self.output_file, self.jsonl_file
+            return self.output_file, None
     
     def create_consumer(self):
         """Crea e configura il consumer Kafka per il topic di risultati."""
@@ -134,7 +139,7 @@ class KafkaResultConsumer:
         all_data_processed = False
         last_message_time = datetime.now()
         
-        print(f"[INFO] Inizio elaborazione continua. Output su: {self.output_file}")
+        print(f"[INFO] Inizio elaborazione continua.")
         
         try:
             while not all_data_processed:
@@ -155,19 +160,17 @@ class KafkaResultConsumer:
                             
                             batch_id = row[0]
                             all_records.append(row)
-                            
-                            # Salviamo il record nel file CSV
-                            with open(self.output_file, mode='a', newline='') as csvfile:
-                                writer = csv.writer(csvfile)
-                                writer.writerow(row)
-                            
-                            # Nel caso di query 3 dobbiamo poi inviare i risultati al challenger
-                            if self.query_type == "query3" and batch_id not in self.batch_processed:
-                                self._process_query3_result(batch_id, bench_id)
+
+                            if self.query_type == "query3":
+                                self._process_query3_message(row, batch_id, bench_id)
+                            else:
+                                with open(self.output_file, mode='a', newline='') as csvfile:
+                                    writer = csv.writer(csvfile)
+                                    writer.writerow(row)
                 else:
                     # Se non ci sono messaggi per 10 secondi, termina
-                    if (datetime.now() - last_message_time).total_seconds() > 30:
-                        print("[INFO] Nessun messaggio ricevuto per 30 secondi, elaborazione completata")
+                    if (datetime.now() - last_message_time).total_seconds() > 10:
+                        print("[INFO] Nessun messaggio ricevuto per 10 secondi, elaborazione completata")
                         all_data_processed = True
                 
                 time.sleep(0.01)  # Pausa breve per non sovraccaricare la CPU
@@ -184,33 +187,55 @@ class KafkaResultConsumer:
             if self.query_type == "query3":
                 self._end_benchmark(bench_id)
     
-    def _process_query3_result(self, batch_id, bench_id):
-        """Processa e invia un risultato della query3 all'API di benchmark."""
+    def _process_query3_message(self, row, batch_id, bench_id):
+        """Processa un messaggio della query3, lo salva in JSONL e lo invia all'API."""
+        if batch_id in self.batch_processed:
+            return
+        
         try:
-            # Conversione CSV in JSONL
-            # TODO: vedere se dobbiamo usare JSON o il formato binario come accade nel client_ref
-            csv_cluster_to_jsonl(self.output_file, self.jsonl_file)
-            
-            # Trova la riga corrispondente al batch_id
-            batch_entry = None
-            with open(self.jsonl_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    entry = json.loads(line)
-                    if str(entry["batch_id"]) == str(batch_id):
-                        batch_entry = entry
-                        break
-            
-            if batch_entry:
-                # Invia il risultato all'API
-                response = self.session.post(
-                    f"{self.api_url}/api/result/0/{bench_id}/{batch_id}",
-                    json=batch_entry
-                )
-                print(f"[INFO] Risultato per batch {batch_id} inviato: {response.status_code}")
-                self.batch_processed.add(batch_id)
+            seq_id, print_id, tile_id, saturated = row[:4]
+            centroids_raw = ",".join(row[4:])  # Unisce tutte le colonne rimanenti
+
+            # Estrazione dei centroidi con la regex
+            centroids = []
+            centroids_raw = centroids_raw.strip()
+            if centroids_raw.startswith("["):
+                centroids_raw = centroids_raw[1:]
+            if centroids_raw.endswith("]"):
+                centroids_raw = centroids_raw[:-1]
+
+            for match in CLUSTER_RGX.finditer(centroids_raw):
+                x, y, count = match.groups()
+                centroids.append({
+                    "x": float(x),
+                    "y": float(y),
+                    "count": int(count)
+                })
+
+            # Creazione del record JSON
+            json_record = {
+                "batch_id": int(seq_id),
+                "print_id": print_id,
+                "tile_id": int(tile_id),
+                "saturated": int(saturated),
+                "centroids": centroids
+            }
+
+            # Salvataggio nel file JSONL
+            with open(self.jsonl_file, "a", encoding="utf-8") as jsonfile:
+                json.dump(json_record, jsonfile)
+                jsonfile.write("\n")
+
+            # Invio del risultato all'API
+            response = self.session.post(
+                f"{self.api_url}/api/result/0/{bench_id}/{batch_id}",
+                json=json_record
+            )
+            print(f"[INFO] Risultato per batch {batch_id} inviato: {response.status_code}")
+            self.batch_processed.add(batch_id)
         except Exception as e:
-            print(f"[ERRORE] Elaborazione batch {batch_id} fallita: {str(e)}")
-    
+            print(f"[ERRORE] Elaborazione del messaggio per batch {batch_id} fallita: {str(e)}")
+
     def _end_benchmark(self, bench_id):
         print("[INFO] Chiusura del benchmark...")
         try:
