@@ -226,11 +226,15 @@ class KafkaResultConsumer:
                 json.dump(json_record, jsonfile)
                 jsonfile.write("\n")
 
+            binary_data = json.dumps(json_record).encode('utf-8') # decommentare se vogliamo usare il binario
+
             # Invio del risultato all'API
             response = self.session.post(
                 f"{self.api_url}/api/result/0/{bench_id}/{batch_id}",
-                json=json_record
+                # json=json_record      # se vogliamo usare il JSON
+                data=binary_data      # se vogliamo usare il binario dobbiamo commentare la riga sopra
             )
+
             print(f"[INFO] Risultato per batch {batch_id} inviato: {response.status_code}")
             self.batch_processed.add(batch_id)
         except Exception as e:
