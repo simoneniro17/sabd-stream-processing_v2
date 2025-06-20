@@ -43,6 +43,7 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
                 currentLayer.layerId,
                 currentLayer.temperatureMatrix,
                 currentLayer.saturatedCount,
+                currentLayer.processingStartTime,
                 "()", "", "()", "", "()", "", "()", "", "()", "",
                 Collections.emptyList() // Lista vuota di outlier
             );
@@ -222,6 +223,7 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
                 currentLayer.layerId,
                 currentLayer.temperatureMatrix,
                 currentLayer.saturatedCount,
+                currentLayer.processingStartTime,
                 points[0], deviations[0],
                 points[1], deviations[1],
                 points[2], deviations[2],

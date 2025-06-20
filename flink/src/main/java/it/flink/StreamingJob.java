@@ -6,6 +6,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 
+import it.flink.metrics.TimedMapFunction;
 import it.flink.model.TileLayerData;
 import it.flink.processing.Query2;
 import it.flink.processing.Query3;
@@ -50,6 +51,11 @@ public class StreamingJob {
         // Convertiamo il DataStream originale da Kafka in un DataStream di TileLayerData con la map personalizzata
         DataStream<TileLayerData> tileLayerStream = kafkaStream.map(new TileLayerExtractor());
 
+        tileLayerStream = tileLayerStream.map(tile -> {
+            tile.processingStartTime = System.currentTimeMillis();
+            return tile;
+        }).returns(TileLayerData.class);
+
         // Esecuzione Query 1
         tileLayerStream = processQuery1(tileLayerStream);
         tileLayerStream.print("Query 1 - Saturation Results");
@@ -60,6 +66,8 @@ public class StreamingJob {
         // Esecuzione Query 3
         tileLayerStream = processQuery3(tileLayerStream);
         tileLayerStream.print("Query 3 - Outlier Results");
+
+        tileLayerStream = tileLayerStream.map(new TimedMapFunction());
 
         // Esecuzione del job
         env.execute("StreamingJob");

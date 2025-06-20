@@ -26,6 +26,9 @@ public class TileLayerData {
     // Lista dei cluster risultanti dal clustering DBSCAN (calcolati da Q3)
     public List<Cluster> clusters;
 
+    // Timestamp
+    public long processingStartTime = 0L; 
+
     // Costruttore di default 
     public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix) {
         this.batchId = batchId;
@@ -39,17 +42,18 @@ public class TileLayerData {
     // ========================== COSTRUTTORI ===========================
 
     // Costruttore che contiene la saturazione (output di Q1)
-    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount) {
+    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount, long processingStartTime) {
         this.batchId = batchId;
         this.printId = printId;
         this.tileId = tileId;
         this.layerId = layerId;
         this.temperatureMatrix = temperatureMatrix;
         this.saturatedCount = saturatedCount; 
+        this.processingStartTime = processingStartTime;
     }
 
     // Costruttore che contiene saturazione (output di Q1) e outlierPoints (output di Q2)
-    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount,
+    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount, long processingStartTime,
                         String p1, String dp1, String p2, String dp2,
                         String p3, String dp3, String p4, String dp4,
                         String p5, String dp5,
@@ -60,6 +64,7 @@ public class TileLayerData {
         this.layerId = layerId;
         this.temperatureMatrix = temperatureMatrix;
         this.saturatedCount = saturatedCount; 
+        this.processingStartTime = processingStartTime;
         this.p1 = p1; this.dp1 = dp1;
         this.p2 = p2; this.dp2 = dp2;
         this.p3 = p3; this.dp3 = dp3;
@@ -69,7 +74,7 @@ public class TileLayerData {
     }
 
     // Costruttore che contiene saturazione (output di Q1), outlierPoints (output di Q2) e clusters (output di Q3)
-    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount,
+    public TileLayerData(String batchId, String printId, String tileId, int layerId, int[][] temperatureMatrix, int saturatedCount, long processingStartTime,
                         String p1, String dp1, String p2, String dp2,
                         String p3, String dp3, String p4, String dp4,
                         String p5, String dp5,
@@ -81,6 +86,7 @@ public class TileLayerData {
         this.layerId = layerId;
         this.temperatureMatrix = temperatureMatrix;
         this.saturatedCount = saturatedCount; 
+        this.processingStartTime = processingStartTime;
         this.p1 = p1; this.dp1 = dp1;
         this.p2 = p2; this.dp2 = dp2;
         this.p3 = p3; this.dp3 = dp3;
