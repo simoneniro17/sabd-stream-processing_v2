@@ -6,7 +6,8 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 
-import it.flink.metrics.TimedMapFunction;
+import it.flink.metrics.QueryMetrics;
+import it.flink.metrics.QueryMetrics.MetricType;
 import it.flink.model.TileLayerData;
 import it.flink.processing.Query2;
 import it.flink.processing.Query3;
@@ -29,21 +30,28 @@ import it.flink.utils.KafkaWait;
  * Legge dati da Kafka, esegue le query di analisi e scrive i risultati su Kafka.
  */
 public class StreamingJob {
-    // Configurazione Kafka
+    // True per abilitare metriche (se è a false non troviamo le metriche in UI)
+    private static final boolean ENABLE_PROFILING = false;
+
     private static final String KAFKA_BOOTSTRAP_SERVER = "kafka:9092";
     private static final String INPUT_TOPIC = "gc-batches";
     private static final String SATURATION_OUTPUT_TOPIC = "query1-results";
     private static final String OUTLIER_OUTPUT_TOPIC = "query2-results";
     private static final String CLUSTER_OUTPUT_TOPIC = "query3-results";
 
+
+
     public static void main(String[] args) throws Exception {
         // Definiamo l'ambiente di esecuzione
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         // TODO: se si vuole eseguire in parallelo su più task manager, impostare il parallelismo
         // env.setParallelism(2);
+
+
         KafkaWait.waitForBroker("kafka", 9092, 1000);
         KafkaTopicUtils.waitForTopic(KAFKA_BOOTSTRAP_SERVER, INPUT_TOPIC, 1000);
 
+        // env.disableOperatorChaining(); // Utile se vogliamo il DAG non ottimizzato
 
         // Configurazione e creazione del DataStream dalla sorgente Kafka
         DataStream<Map<String, Object>> kafkaStream = createKafkaSource(env);
@@ -58,16 +66,12 @@ public class StreamingJob {
 
         // Esecuzione Query 1
         tileLayerStream = processQuery1(tileLayerStream);
-        tileLayerStream.print("Query 1 - Saturation Results");
 
         // Esecuzione Query 2
         tileLayerStream = processQuery2(tileLayerStream);
 
         // Esecuzione Query 3
         tileLayerStream = processQuery3(tileLayerStream);
-        tileLayerStream.print("Query 3 - Outlier Results");
-
-        tileLayerStream = tileLayerStream.map(new TimedMapFunction());
 
         // Esecuzione del job
         env.execute("StreamingJob");
@@ -77,7 +81,7 @@ public class StreamingJob {
         KafkaSource<Map<String, Object>> source = KafkaSource.<Map<String, Object>>builder()
             .setBootstrapServers(KAFKA_BOOTSTRAP_SERVER)
             .setTopics(INPUT_TOPIC)
-            .setGroupId("flink-consumer")
+            .setGroupId("flink-consumer-" + System.currentTimeMillis()) // Gruppo di consumer unico per ogni esecuzione
             .setStartingOffsets(OffsetsInitializer.earliest())  // Con "earliest" leggiamo messaggi nel topic scritti prima dell'avvio del job
             .setValueOnlyDeserializer(new MsgPackDeserializationSchema())   // Deserializer personalizzato
             .build();
@@ -88,7 +92,8 @@ public class StreamingJob {
 
     private static DataStream<TileLayerData> processQuery1 (DataStream<TileLayerData> tileLayerStream) {
         tileLayerStream = tileLayerStream
-            .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class);
+            .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class)
+            .map(new QueryMetrics("Query1", MetricType.QUERY1, ENABLE_PROFILING));
 
         // Output su Kafka
         new KafkaResultPublisher<>(SATURATION_OUTPUT_TOPIC, new Query1OutputSerializationSchema(), "Q1-sink-")
@@ -99,11 +104,18 @@ public class StreamingJob {
     }
 
     private static DataStream<TileLayerData> processQuery2(DataStream<TileLayerData> tileLayerStream) {
+        // Timestamp di inizio Q2
+        tileLayerStream = tileLayerStream.map(tile -> {
+            tile.q2StartTime = System.currentTimeMillis();
+            return tile;
+        });
+
         // Processamento delle finestre scorrevoli
         tileLayerStream = tileLayerStream
             .keyBy(tile -> tile.printId + "_" + tile.tileId)
             .countWindow(3, 1)
-            .process(new Query2());
+            .process(new Query2())
+            .map(new QueryMetrics("query2", MetricType.QUERY2, ENABLE_PROFILING));
 
         // Output Query 2 (scrittura su Kafka)
         new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new Query2OutputSerializationSchema(), "Q2-sink-")

@@ -36,7 +36,10 @@ public class Query1 {
             tile.layerId,
             tile.temperatureMatrix,
             saturatedCount, 
-            tile.processingStartTime
+            tile.processingStartTime,
+            tile.q1EndTime,
+            tile.q2StartTime,
+            tile.q2EndTime
         );
     }
 }

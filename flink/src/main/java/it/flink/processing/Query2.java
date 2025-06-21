@@ -31,7 +31,7 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
 
         // Verifichiamo che ci siano i tre layer necessari per l'analisi
         if (layers.size() < WINDOW_SIZE) {
-            System.out.println("Dati insufficienti per " + key + ". Richiesti: " + WINDOW_SIZE + ", trovati: " + layers.size());
+            // System.out.println("Dati insufficienti per " + key + ". Richiesti: " + WINDOW_SIZE + ", trovati: " + layers.size());
 
             TileLayerData currentLayer = layers.get(layers.size() - 1);
         
@@ -44,6 +44,9 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
                 currentLayer.temperatureMatrix,
                 currentLayer.saturatedCount,
                 currentLayer.processingStartTime,
+                currentLayer.q1EndTime,
+                currentLayer.q2StartTime,
+                currentLayer.q2EndTime,
                 "()", "", "()", "", "()", "", "()", "", "()", "",
                 Collections.emptyList() // Lista vuota di outlier
             );
@@ -73,10 +76,10 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
         //TODO: ma siamo sicuri che vada bene fare questa cosa?
         layers.sort(Comparator.comparingInt(t -> t.layerId));
 
-        // Log di debug
-        System.out.print("Finestra contiene i layer: ");
-        layers.forEach(layer -> System.out.print(layer.layerId + " "));
-        System.out.println();
+        // // Log di debug
+        // System.out.print("Finestra contiene i layer: ");
+        // layers.forEach(layer -> System.out.print(layer.layerId + " "));
+        // System.out.println();
 
         return layers;
     }
@@ -224,6 +227,9 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
                 currentLayer.temperatureMatrix,
                 currentLayer.saturatedCount,
                 currentLayer.processingStartTime,
+                currentLayer.q1EndTime,
+                currentLayer.q2StartTime,
+                currentLayer.q2EndTime,
                 points[0], deviations[0],
                 points[1], deviations[1],
                 points[2], deviations[2],
