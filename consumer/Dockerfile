@@ -10,6 +10,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiamo il codice dell'applicazione
 COPY consumer/app/ /app/
-
-
-

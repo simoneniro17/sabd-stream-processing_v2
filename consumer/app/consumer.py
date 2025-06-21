@@ -5,6 +5,8 @@ import re
 import json
 import time
 import requests
+import logging
+import sys
 
 from datetime import datetime
 
@@ -12,6 +14,18 @@ from kafka import KafkaConsumer, TopicPartition
 
 # Regex per estrarre i centroidi
 CLUSTER_RGX = re.compile(r"\{'x': ([\d.]+); 'y': ([\d.]+); 'count': (\d+)\}")
+
+# Configurazione del logging
+logging.basicConfig(
+    level=logging.INFO,
+    format = '%(asctime)s - %(levelname)s - %(message)s',
+    datefmt = '%Y-%m-%d %H:%M:%S',
+    handlers = [logging.StreamHandler(sys.stdout)]
+)
+for name in sorted(logging.root.manager.loggerDict):
+    logging.getLogger(name).setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 
 class KafkaResultConsumer:
     """Gestisce il consumo di messaggi Kafka, il salvataggio su file e l'invio dei risultati all'API."""
@@ -46,14 +60,13 @@ class KafkaResultConsumer:
         self._wait_for_topic(self.topic)
     
     def _wait_for_topic(self, topic):
-        """Attende che un singolo topic sia disponibile."""
         consumer = KafkaConsumer(bootstrap_servers=self.broker)
-        print(f"[INFO] In attesa del topic '{topic}'...")
+        logger.info(f"In attesa del topic '{topic}'...")
         
         while True:
             topics = consumer.topics()
             if topic in topics:
-                print(f"[INFO] Topic '{topic}' trovato.")
+                logger.info(f"Topic '{topic}' trovato.")
                 consumer.close()
                 return
             time.sleep(2)
@@ -87,10 +100,10 @@ class KafkaResultConsumer:
         bench_consumer.close()
         
         if not bench_id:
-            print(f"[ERRORE] Impossibile leggere il bench_id dal topic '{self.bench_topic}'.")
+            logger.error(f"Impossibile leggere il bench_id dal topic '{self.bench_topic}'.")
             return None
         
-        print(f"[INFO] Letto bench_id dal topic '{self.bench_topic}': {bench_id}")
+        logger.info(f"Letto bench_id dal topic '{self.bench_topic}': {bench_id}")
         return bench_id
     
     def setup_output_files(self):
@@ -101,13 +114,13 @@ class KafkaResultConsumer:
         if self.query_type == "query3":     # Per la query 3 configuriamo solo il JSON
             filename = f"{topic_name}_{timestamp}.jsonl"
             self.jsonl_file = os.path.join(self.output_dir, filename)
-            print(f"[INFO] Scrittura su: {self.jsonl_file}")
+            logger.info(f"Scrittura su: {self.jsonl_file}")
 
             return None, self.jsonl_file
         else:   # Per le altre query configuriamo solo il CSV
             filename = f"{topic_name}_{timestamp}.csv"
             self.output_file = os.path.join(self.output_dir, filename)
-            print(f"[INFO] Scrittura su: {self.output_file}")    
+            logger.info(f"Scrittura su: {self.output_file}")    
         
             # Creazione e inizializzazione del file CSV con l'header appropriato
             with open(self.output_file, mode='w', newline='') as csvfile:
@@ -139,7 +152,7 @@ class KafkaResultConsumer:
         all_data_processed = False
         last_message_time = datetime.now()
         
-        print(f"[INFO] Inizio elaborazione continua.")
+        logger.info(f"Inizio elaborazione continua...")
         
         try:
             while not all_data_processed:
@@ -170,18 +183,18 @@ class KafkaResultConsumer:
                 else:
                     # Se non ci sono messaggi per 10 secondi, termina
                     if (datetime.now() - last_message_time).total_seconds() > 10:
-                        print("[INFO] Nessun messaggio ricevuto per 10 secondi, elaborazione completata")
+                        logger.warning("Nessun messaggio ricevuto per 10 secondi, elaborazione completata")
                         all_data_processed = True
                 
                 time.sleep(0.01)  # Pausa breve per non sovraccaricare la CPU
                 
         except KeyboardInterrupt:
-            print("[INFO] Elaborazione interrotta dall'utente")
+            logger.info("Elaborazione interrotta dall'utente")
         except Exception as e:
-            print(f"[ERRORE] Si è verificato un errore: {e}")
+            logger.error(f"Si è verificato un errore: {e}")
         finally:
             consumer.close()
-            print(f"[INFO] Totale record elaborati: {len(all_records)}")
+            logger.info(f"Totale record elaborati: {len(all_records)}")
             
             # Chiusura benchmark per query3 in modo da ottenere i risultati finali
             if self.query_type == "query3":
@@ -235,18 +248,19 @@ class KafkaResultConsumer:
                 data=binary_data      # se vogliamo usare il binario dobbiamo commentare la riga sopra
             )
 
-            print(f"[INFO] Risultato per batch {batch_id} inviato: {response.status_code}")
+            if batch_id % 16 == 0:
+                logger.info(f"Risultato per batch {batch_id} inviato: {response.status_code}")
             self.batch_processed.add(batch_id)
         except Exception as e:
-            print(f"[ERRORE] Elaborazione del messaggio per batch {batch_id} fallita: {str(e)}")
+            logger.error(f"Elaborazione del messaggio per batch {batch_id} fallita: {str(e)}")
 
     def _end_benchmark(self, bench_id):
-        print("[INFO] Chiusura del benchmark...")
+        logger.info("Chiusura del benchmark...")
         try:
             end_resp = self.session.post(f"{self.api_url}/api/end/{bench_id}")
-            print(f"[INFO] Benchmark {bench_id} terminato. Risposta: {end_resp.text}")
+            logger.info(f"Benchmark {bench_id} terminato. Risposta: {end_resp.text}")
         except Exception as e:
-            print(f"[ERRORE] Errore durante la chiusura del benchmark: {e}")
+            logger.error(f"Errore durante la chiusura del benchmark: {e}")
 
 
 def parse_arguments():
@@ -283,4 +297,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(line_buffering=True)
     main()

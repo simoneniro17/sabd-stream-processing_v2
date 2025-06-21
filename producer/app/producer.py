@@ -21,6 +21,8 @@ logging.basicConfig(
     datefmt = '%Y-%m-%d %H:%M:%S',
     handlers = [logging.StreamHandler(sys.stdout)]
 )
+for name in sorted(logging.root.manager.loggerDict):
+    logging.getLogger(name).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 def main():
