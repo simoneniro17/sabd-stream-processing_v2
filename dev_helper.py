@@ -31,13 +31,38 @@ def run_command(command: List[str], cwd=None) -> bool:
         return False
 
 def start_services() -> bool:
-    """Avvia i servizi con docker-compose"""
-    print("Avvio dei servizi...")
-    success = run_command(["docker", "compose", "up", "-d"])
-    if success:
-        print(f"Attesa di {SERVICE_START_WAIT} secondi per l'inizializzazione dei servizi...")
-        time.sleep(SERVICE_START_WAIT)
-    return success
+    """Avvia i servizi con docker-compose in modo sequenziale"""
+    print("Avvio dei servizi in modo sequenziale...")
+    
+    # 1. Avvia kafka
+    print("1. Avvio del servizio Kafka e del LOCAL-CHALLENGER...")
+    success = run_command(["docker", "compose", "up", "-d", "kafka", "gc-challenger"])
+    if not success:
+        print("Errore nell'avviare il servizio Kafka o LOCAL-CHALLENGER")
+        return False
+    
+    print("Attesa di 10 secondi per l'inizializzazione di Kafka e LOCAL-CHALLENGER...")
+    time.sleep(10)
+    
+    # 2. Avvia flink-client
+    print("2. Avvio del servizio Flink Client...")
+    success = run_command(["docker", "compose", "up", "-d", "flink-client"])
+    if not success:
+        print("Errore nell'avviare il servizio Flink Client")
+        return False
+    
+    print("Attesa di 15 secondi per l'inizializzazione di Flink Client...")
+    time.sleep(15)
+    
+    # 3. Avvia producer e consumer
+    print("3. Avvio dei servizi Producer e Consumer...")
+    success = run_command(["docker", "compose", "up", "-d", "producer", "consumer"])
+    if not success:
+        print("Errore nell'avviare i servizi Producer e Consumer")
+        return False
+    
+    print("Tutti i servizi sono stati avviati con successo")
+    return True
 
 def build_flink_jar() -> bool:
     """Compila il JAR di Flink"""

@@ -12,3 +12,6 @@ gc25-chall
 # Output consumer
 consumer/output/
 results
+
+# JAR di Flink
+flink/jobs/*.jar
