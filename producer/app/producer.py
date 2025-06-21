@@ -2,6 +2,7 @@ import requests
 import time
 import sys
 import argparse
+import logging
 
 from kafka import KafkaProducer
 
@@ -11,8 +12,16 @@ BATCHES_TOPIC = 'gc-batches'
 BENCH_TOPIC = 'gc-bench'
 API_URL = 'http://gc-challenger:8866'
 MAX_RETRIES = 10
-WAIT_TIME = 3   # tempo di attesa (s) tra i tentativi di connessione
+WAIT_TIME = 3       # tempo di attesa (s) tra i tentativi di connessione
 
+# Configurazione del logging
+logging.basicConfig(
+    level=logging.INFO,
+    format = '%(asctime)s - %(levelname)s - %(message)s',
+    datefmt = '%Y-%m-%d %H:%M:%S',
+    handlers = [logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(description="Producer per la scrittura dei dati del local challenger su Kafka")
@@ -29,13 +38,13 @@ def main():
     for attempt in range(MAX_RETRIES):
         try:
             producer = KafkaProducer(bootstrap_servers=KAFKA_BROKER)
-            print(f"Connesso a Kafka su {KAFKA_BROKER}")
+            logger.info(f"Connesso a Kafka su {KAFKA_BROKER}")
             break
         except Exception as e:
-            print(f"Errore di connessione a Kafka: {e}. Tentativo {attempt + 1}/{MAX_RETRIES}")
+            logger.warning(f"Errore di connessione a Kafka: {e}. Tentativo {attempt + 1}/{MAX_RETRIES}")
             time.sleep(WAIT_TIME)
     else:
-        print("Impossibile connettersi a Kafka.")
+        logger.error("Impossibile connettersi a Kafka.")
         sys.exit(1)
 
     # Tentativo di connessione al challenger
@@ -45,20 +54,20 @@ def main():
             # visto che il GC non mette a disposizione un endpoint di healthcheck
             test_response = session.get(f"{API_URL}/dash")
             test_response.raise_for_status()
-            print(f"Connesso al Challenger su {API_URL}")
+            logger.info(f"Connesso al Challenger su {API_URL}")
             break
         except requests.RequestException as e:
-            print(f"Errore di connessione al challenger: {e}. Tentativo {attempt + 1}/{MAX_RETRIES}")
+            logger.warning(f"Errore di connessione al challenger: {e}. Tentativo {attempt + 1}/{MAX_RETRIES}")
             time.sleep(WAIT_TIME)
     else:
-        print("Impossibile connettersi al Challenger.")
+        logger.error("Impossibile connettersi al Challenger.")
         sys.exit(1)
 
     # === CREAZIONE E AVVIO DELLA SESSIONE DI BENCHMARK ===
-    print("Creazione della sessione di benchmark...")
+    logger.info("Creazione della sessione di benchmark...")
     create_params = {
         "apitoken": "polimi-deib",
-        "name": "kafka-pipeline",
+        "name": "flink",
         "test": True
     }
     
@@ -69,15 +78,15 @@ def main():
     create_resp = session.post(f"{API_URL}/api/create", json=create_params)
     create_resp.raise_for_status()
     bench_id = create_resp.json()
-    print(f"Benchmark ID: {bench_id}")
+    logger.info(f"Benchmark ID: {bench_id}")
 
-    print("Avvio benchmark...")
-    start_resp = session.post(f"{API_URL}/api/start/{bench_id}")
+    logger.info("Avvio benchmark...")
+    session.post(f"{API_URL}/api/start/{bench_id}")
 
-    # Produzione del messaggio con il Benchmark ID su Kafka
+    # Scriviamo il Benchmark ID su Kafka affinché il consumer possa leggerlo e chiudere lui la connessione
     producer.send(BENCH_TOPIC, value=bench_id.encode('utf-8'))
     producer.flush()
-    print(f"Prodotto Benchmark ID su Kafka.")
+    logger.info(f"Scritto Benchmark ID su Kafka.")
 
     # === PRODUZIONE DEI BATCH ===
     i = 0
@@ -85,42 +94,33 @@ def main():
         while True:
             # Controllo del limite di batch
             if max_batches is not None and i >= max_batches:
-                print(f"Raggiunto il limite di {max_batches} batch.")
+                logger.info(f"Raggiunto il limite di {max_batches} batch.")
                 break
             
-            print(f"Richiesta del batch {i}...")
+            if i % 16 == 0:
+                logger.info(f"Richiesta del batch {i}...")
             batch_resp = session.get(f"{API_URL}/api/next_batch/{bench_id}")
             if batch_resp.status_code == 404:
-                print("Nessun altro batch disponibile.")
+                logger.info("Nessun altro batch disponibile.")
                 break
             batch_resp.raise_for_status()
 
             # Produzione del messaggio con i batch su Kafka
             producer.send(BATCHES_TOPIC, value=batch_resp.content)
             producer.flush()    # Ci assicuriamo che il messaggio sia stato inviato prima di continuare
-            print(f"Prodotto batch {i} su Kafka.")
-
-            # Risultato fittizio al challenger, soltanto per evitare che il producer crashi quando finisce
-            # result_resp = session.post(
-            #     f"{API_URL}/api/result/0/{bench_id}/{i}",
-            #     json={"batch_id": i, "status": "processed"}
-            # )
+            if i % 16 == 0:
+                logger.info(f"Scritto batch {i} su Kafka.")
 
             i += 1
     except KeyboardInterrupt:
-        print("Interruzione da tastiera. Terminazione della produzione.")
+        logger.info("Interruzione da tastiera. Terminazione della produzione.")
     except Exception as e:
-        print(f"Errore durante la produzione: {e}")
+        logger.error(f"Errore durante la produzione: {e}")
     finally:
-        # # === FINE DELLA SESSIONE DI BENCHMARK ===
-        # end_resp = session.post(f"{API_URL}/api/end/{bench_id}")
-        # end_resp.raise_for_status()
-        # print("Sessione di benchmark terminata.")
-
-        # Chiusura del producer
         if producer:
             producer.close()
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(line_buffering=True)
     main()
