@@ -248,7 +248,7 @@ class KafkaResultConsumer:
                 data=binary_data      # se vogliamo usare il binario dobbiamo commentare la riga sopra
             )
 
-            if batch_id % 16 == 0:
+            if int(batch_id) % 16 == 0:
                 logger.info(f"Risultato per batch {batch_id} inviato: {response.status_code}")
             self.batch_processed.add(batch_id)
         except Exception as e:

@@ -1,0 +1,1 @@
+Result: {"0":{"count":160,"missing":0,"throughput":0.6907570924709355,"latency_mean":"1s446ms452µs663ns","latency_min":"3ms44µs783ns","latency_max":"4s202ms537µs328ns","latency_p99":"4s202ms537µs328ns"}}
