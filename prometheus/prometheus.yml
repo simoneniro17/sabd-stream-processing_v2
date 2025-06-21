@@ -1,7 +1,24 @@
 global:
-  scrape_interval: 1s
+  scrape_interval: 5s
+  evaluation_interval: 5s
 
 scrape_configs:
-  - job_name: 'flink'
+  - job_name: 'flink-jobmanager'
     static_configs:
-      - targets: ['jobmanager:9249', 'taskmanager1:9250', 'taskmanager2:9251']
+      - targets: ['jobmanager:9249']
+        labels:
+          component: 'jobmanager'
+  
+  - job_name: 'flink-taskmanager-1'
+    static_configs:
+      - targets: ['taskmanager1:9250']
+        labels:
+          component: 'taskmanager'
+          instance: 'taskmanager1'
+  
+  - job_name: 'flink-taskmanager-2'
+    static_configs:
+      - targets: ['taskmanager2:9251']
+        labels:
+          component: 'taskmanager'
+          instance: 'taskmanager2'

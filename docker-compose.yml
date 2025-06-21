@@ -161,6 +161,23 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    tty: true
+    networks:
+      - sabd-stream-processing-network
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboard-definitions:/var/lib/grafana/dashboards
+    tty: true
     networks:
       - sabd-stream-processing-network
 
