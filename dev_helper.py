@@ -43,7 +43,7 @@ def start_services() -> bool:
     
     # 1. Avvia kafka
     print("1. Avvio del servizio Kafka e del LOCAL-CHALLENGER...")
-    success = run_command(["docker", "compose", "up", "-d", "kafka", "gc-challenger"])
+    success = run_command(["docker", "compose", "up", "-d", "kafka", "gc-challenger", "prometheus"])
     if not success:
         print("Errore nell'avviare il servizio Kafka o LOCAL-CHALLENGER")
         return False

@@ -1,0 +1,10 @@
+# Configurazione delle metriche per Flink
+metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+
+# Configurazione degli scope per le metriche
+metrics.scope.jm: jobmanager
+metrics.scope.tm: taskmanager.<tm_id>
+metrics.scope.task: taskmanager.<tm_id>.<job_name>.<operator_name>.<subtask_index>
+
+# Abilita le metriche di sistema
+metrics.system-resource: true

@@ -20,6 +20,7 @@ import it.flink.utils.TileLayerExtractor;
 import it.flink.utils.KafkaResultPublisher;
 import it.flink.utils.KafkaTopicUtils;
 
+import org.apache.flink.configuration.Configuration;
 import java.util.Map;
 
 import it.flink.utils.KafkaWait;
@@ -40,10 +41,13 @@ public class StreamingJob {
     private static final String CLUSTER_OUTPUT_TOPIC = "query3-results";
 
     public static void main(String[] args) throws Exception {
+        Configuration config = new Configuration();
+        config.setString("metrics.reporter.prom.factory.class", "org.apache.flink.metrics.prometheus.PrometheusReporterFactory");
+
         // Definiamo l'ambiente di esecuzione
-        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
         // TODO: se si vuole eseguire in parallelo su più task manager, impostare il parallelismo
-        env.setParallelism(4);
+        env.setParallelism(2);
 
         KafkaWait.waitForBroker("kafka", 9092, 1000);
         KafkaTopicUtils.waitForTopic(KAFKA_BOOTSTRAP_SERVER, INPUT_TOPIC, 1000);
