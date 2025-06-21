@@ -1,0 +1,1 @@
+Benchmark 01JY9NRX6TNMPK56VMRTFH6TK8 terminato. Risposta: {"0":{"count":160,"missing":0,"throughput":15.175665371983357,"latency_mean":"5s914ms67µs586ns","latency_min":"1s482ms851µs946ns","latency_max":"10s392ms368µs618ns","latency_p99":"10s392ms368µs618ns"}}

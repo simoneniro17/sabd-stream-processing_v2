@@ -14,4 +14,4 @@ consumer/output/
 results
 
 # JAR di Flink
-flink/jobs/*.jar
+flink/jobs/flink-1.0-SNAPSHOT.jar

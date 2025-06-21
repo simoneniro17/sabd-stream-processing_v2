@@ -57,7 +57,7 @@ services:
       - gc-challenger
     volumes:
       - ./producer/app:/app
-    command: ["python", "/app/producer.py", "--limit", "96"]
+    command: ["python", "/app/producer.py", "--limit", "160"]
     #command: ["python", "/app/producer.py"]
     networks:
       - sabd-stream-processing-network

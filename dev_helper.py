@@ -29,6 +29,13 @@ def run_command(command: List[str], cwd=None) -> bool:
     except Exception as e:
         print(f"Errore: {str(e)}")
         return False
+    
+def down_services() -> bool:
+    print("DISTRUGGENDO i container attivi...")
+    success = run_command(["docker", "compose", "down", "-v"])
+    if not success:
+        print("Errore nella DISTRUZIONE dei container")
+        return False
 
 def start_services() -> bool:
     """Avvia i servizi con docker-compose in modo sequenziale"""
@@ -137,6 +144,7 @@ def main():
     args = parser.parse_args()
 
     if args.all or args.build:
+        down_services()
         build_flink_jar()
 
     if args.all or args.start:

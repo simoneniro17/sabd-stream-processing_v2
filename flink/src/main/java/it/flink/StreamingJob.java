@@ -31,7 +31,7 @@ import it.flink.utils.KafkaWait;
  */
 public class StreamingJob {
     // True per abilitare metriche (se è a false non troviamo le metriche in UI)
-    private static final boolean ENABLE_PROFILING = false;
+    private static final boolean ENABLE_PROFILING = true;
 
     private static final String KAFKA_BOOTSTRAP_SERVER = "kafka:9092";
     private static final String INPUT_TOPIC = "gc-batches";
@@ -39,14 +39,11 @@ public class StreamingJob {
     private static final String OUTLIER_OUTPUT_TOPIC = "query2-results";
     private static final String CLUSTER_OUTPUT_TOPIC = "query3-results";
 
-
-
     public static void main(String[] args) throws Exception {
         // Definiamo l'ambiente di esecuzione
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         // TODO: se si vuole eseguire in parallelo su più task manager, impostare il parallelismo
-        // env.setParallelism(2);
-
+        env.setParallelism(4);
 
         KafkaWait.waitForBroker("kafka", 9092, 1000);
         KafkaTopicUtils.waitForTopic(KAFKA_BOOTSTRAP_SERVER, INPUT_TOPIC, 1000);
@@ -91,9 +88,16 @@ public class StreamingJob {
     
 
     private static DataStream<TileLayerData> processQuery1 (DataStream<TileLayerData> tileLayerStream) {
-        tileLayerStream = tileLayerStream
-            .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class)
-            .map(new QueryMetrics("Query1", MetricType.QUERY1, ENABLE_PROFILING));
+
+        if (ENABLE_PROFILING) {
+            tileLayerStream = tileLayerStream
+                .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class)
+                .map(new QueryMetrics("query1", MetricType.QUERY1, true));
+        }
+        else {
+            tileLayerStream = tileLayerStream
+                .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class); 
+        }
 
         // Output su Kafka
         new KafkaResultPublisher<>(SATURATION_OUTPUT_TOPIC, new Query1OutputSerializationSchema(), "Q1-sink-")
@@ -110,12 +114,21 @@ public class StreamingJob {
             return tile;
         });
 
-        // Processamento delle finestre scorrevoli
-        tileLayerStream = tileLayerStream
-            .keyBy(tile -> tile.printId + "_" + tile.tileId)
-            .countWindow(3, 1)
-            .process(new Query2())
-            .map(new QueryMetrics("query2", MetricType.QUERY2, ENABLE_PROFILING));
+        if (ENABLE_PROFILING) {
+            // Processamento delle finestre scorrevoli
+            tileLayerStream = tileLayerStream
+                .keyBy(tile -> tile.printId + "_" + tile.tileId)
+                .countWindow(3, 1)
+                .process(new Query2())
+                .map(new QueryMetrics("query2", MetricType.QUERY2, true));
+        }
+        else {
+            // Processamento delle finestre scorrevoli
+            tileLayerStream = tileLayerStream
+                .keyBy(tile -> tile.printId + "_" + tile.tileId)
+                .countWindow(3, 1)
+                .process(new Query2()); 
+        }
 
         // Output Query 2 (scrittura su Kafka)
         new KafkaResultPublisher<>(OUTLIER_OUTPUT_TOPIC, new Query2OutputSerializationSchema(), "Q2-sink-")
