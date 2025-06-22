@@ -3,7 +3,7 @@ package it.flink.model;
 import java.util.List;
 
 public class Cluster {
-    private List<OutlierPoint> points;
+    private final List<OutlierPoint> points;
 
     public Cluster(List<OutlierPoint> points) {
         this.points = points;

@@ -12,7 +12,6 @@ import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.Map;
 
-
 /**
  * Trasforma i record ricevuti da Kafka (Map<String, Object>) in oggetti TileLayerData.
  * Si occupa di estrarre i campi, decodificare l'immagine TIFF e convertirla in una matrice di temperature.
@@ -27,13 +26,9 @@ public class TileLayerExtractor implements MapFunction<Map<String, Object>, Tile
         int tileId = Integer.parseInt(extractField(record, "tile_id").toString());
         int layerId = Integer.parseInt(extractField(record, "layer").toString());
 
-        // Gestione del campo "tif" che può essere di diversi tipi, a seconda di come è stato serializzato
+        // Estrazione e decodifica dellìimmagine TIFF
         byte[] tiffBytes = extractTiffData(extractField(record,  "tif"));
-        
-        // Decodifica dell'immagine TIFF
         BufferedImage img = decodeTiffImage(tiffBytes);
-
-        // Creazione della matrice di temperature a partire dai byte TIFF
         int[][] temperatureMatrix = createTemperatureMatrix(img);
         
         return new TileLayerData(batchId, printId, tileId, layerId, temperatureMatrix);
@@ -52,20 +47,25 @@ public class TileLayerExtractor implements MapFunction<Map<String, Object>, Tile
     private byte[] extractTiffData(Object rawTiffData) throws IOException {
         if (rawTiffData instanceof byte[]) {
             return (byte[]) rawTiffData;
-        } else if (rawTiffData instanceof ByteBuffer) {
+        }
+        
+        if (rawTiffData instanceof ByteBuffer) {
             ByteBuffer buf = (ByteBuffer) rawTiffData;
             byte[] bytes = new byte[buf.remaining()];
             buf.get(bytes);
             return bytes;
-        } else if (rawTiffData instanceof String) {
+        }
+        
+        if (rawTiffData instanceof String) {
             try {
                 return Base64.getDecoder().decode((String) rawTiffData);
             } catch (IllegalArgumentException e) {
                 throw new IOException("Errore nella decodifica Base64 dei dati TIFF: " + rawTiffData, e);
             }
-        } else {
-            throw new RuntimeException("Tipo tif non riconosciuto: " + rawTiffData.getClass());
         }
+        
+        throw new RuntimeException("Formato dati TIFF non supportato: " + 
+                                   (rawTiffData != null ? rawTiffData.getClass().getName() : "null"));
     }
 
     /** Decodifica l'immagine TIFF */
@@ -76,16 +76,14 @@ public class TileLayerExtractor implements MapFunction<Map<String, Object>, Tile
                 throw new IOException("Immagine TIFF non valida o non supportata.");
             }
             return img;
-        } catch (IOException e) {
-            throw new IOException("Errore durante la decodifica dell'immagine TIFF.", e);
         }
     }
 
     /** Crea una matrice di temperatura per l'immagine passata come input */
     private int[][] createTemperatureMatrix(BufferedImage img) {
-        // Dimensioni dell'immagine
         int width = img.getWidth();
         int height = img.getHeight();
+        int[][] temperatureMatrix = new int[height][width];
 
         // Assumiamo che l'immagine sia in scala di grigi e creiamo una matrice di temperature
         // La matrice è organizzata come [y][x], dove y è la riga e x è la colonna
@@ -96,7 +94,6 @@ public class TileLayerExtractor implements MapFunction<Map<String, Object>, Tile
 
         // per questo la matrice la creiamo di dimensione [height][width], perché height è l'altezza dell'immagine
         // (che corrisponde al numero di righe) e width è la larghezza dell'immagine (che corrisponde al numero di colonne)
-        int[][] temperatureMatrix = new int[height][width];
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {

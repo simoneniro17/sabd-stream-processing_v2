@@ -15,11 +15,12 @@ public class KafkaResultPublisher<T> {
     
     private final KafkaSink<T> kafkaSink;
 
-    /** Costruttore del processor per l'output verso Kafka */
+    /** Crea un publisher per un topic specifico con lo schema di serializzazione fornito */
     public KafkaResultPublisher(String kafkaTopic, SerializationSchema<T> serializer, String TransactionalIdPrefix) {
         Properties producerConfig = new Properties();
         producerConfig.put(ProducerConfig.ACKS_CONFIG, "all");
 
+        // Creazione del sink Kafka
         this.kafkaSink = KafkaSink.<T>builder()
             .setBootstrapServers(KAFKA_BOOTSTRAP_SERVER)
             .setTransactionalIdPrefix(TransactionalIdPrefix)
@@ -38,4 +39,3 @@ public class KafkaResultPublisher<T> {
         stream.sinkTo(kafkaSink);
     }
 }
-
