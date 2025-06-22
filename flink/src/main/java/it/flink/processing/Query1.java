@@ -29,17 +29,8 @@ public class Query1 {
                 }
             }
         }
-        return new TileLayerData(
-            tile.batchId,
-            tile.printId,
-            tile.tileId,
-            tile.layerId,
-            tile.temperatureMatrix,
-            saturatedCount, 
-            tile.processingStartTime,
-            tile.q1EndTime,
-            tile.q2StartTime,
-            tile.q2EndTime
-        );
+
+        tile.addSaturationResults(saturatedCount);
+        return tile;
     }
 }

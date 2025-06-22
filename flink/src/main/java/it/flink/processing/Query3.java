@@ -23,26 +23,9 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
         List<OutlierPoint> points = tileLayerStream.outlierPoints;
 
         if (points == null || points.isEmpty()) {
-            // Nessun punto, ritorna risultato vuoto
-            return new TileLayerData(
-                tileLayerStream.batchId, 
-                tileLayerStream.printId, 
-                tileLayerStream.tileId, 
-                tileLayerStream.layerId, 
-                tileLayerStream.temperatureMatrix, 
-                tileLayerStream.saturatedCount,
-                tileLayerStream.processingStartTime,
-                tileLayerStream.q1EndTime,
-                tileLayerStream.q2StartTime,
-                tileLayerStream.q2EndTime,
-                tileLayerStream.p1, tileLayerStream.dp1,
-                tileLayerStream.p2, tileLayerStream.dp2,
-                tileLayerStream.p3, tileLayerStream.dp3,
-                tileLayerStream.p4, tileLayerStream.dp4,
-                tileLayerStream.p5, tileLayerStream.dp5,
-                points,
-                Collections.emptyList() // nessun cluster
-        );
+            // Nessun punto, risultato vuoto
+            tileLayerStream.addClusterResults(Collections.emptyList());
+            return tileLayerStream;
         }
 
         Collections.sort(points, (p1, p2) -> 
@@ -76,26 +59,7 @@ public class Query3 implements MapFunction<TileLayerData, TileLayerData> {
             clusters.add(new Cluster(pts));
         }
 
-        // Ritorna il risultato raggruppato
-        return new TileLayerData(
-            tileLayerStream.batchId, 
-            tileLayerStream.printId, 
-            tileLayerStream.tileId, 
-            tileLayerStream.layerId, 
-            tileLayerStream.temperatureMatrix, 
-            tileLayerStream.saturatedCount,
-            tileLayerStream.processingStartTime,
-            tileLayerStream.q1EndTime,
-            tileLayerStream.q2StartTime,
-            tileLayerStream.q2EndTime,
-            tileLayerStream.p1, tileLayerStream.dp1,
-            tileLayerStream.p2, tileLayerStream.dp2,
-            tileLayerStream.p3, tileLayerStream.dp3,
-            tileLayerStream.p4, tileLayerStream.dp4,
-            tileLayerStream.p5, tileLayerStream.dp5,
-            points,
-            clusters
-        );
+        tileLayerStream.addClusterResults(clusters);
+        return tileLayerStream;
     }
-
 }

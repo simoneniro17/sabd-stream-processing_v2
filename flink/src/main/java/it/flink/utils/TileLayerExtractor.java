@@ -21,11 +21,10 @@ public class TileLayerExtractor implements MapFunction<Map<String, Object>, Tile
     
     @Override
     public TileLayerData map(Map<String, Object> record) throws Exception {
-        // Estrazione dei campi necessari dal record
-        // TODO: vogliamo convertire tutti i campi in INT?
-        String batchId = extractField(record, "batch_id").toString();
+        // Estrazione parametri del tile
+        int batchId = Integer.parseInt(extractField(record, "batch_id").toString());
         String printId = extractField(record, "print_id").toString();
-        String tileId = extractField(record, "tile_id").toString();
+        int tileId = Integer.parseInt(extractField(record, "tile_id").toString());
         int layerId = Integer.parseInt(extractField(record, "layer").toString());
 
         // Gestione del campo "tif" che può essere di diversi tipi, a seconda di come è stato serializzato

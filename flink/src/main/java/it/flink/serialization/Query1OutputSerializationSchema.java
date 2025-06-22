@@ -13,7 +13,7 @@ public class Query1OutputSerializationSchema implements SerializationSchema<Tile
             return new byte[0];
         }
 
-        String csv = String.format("%s,%s,%s,%d",
+        String csv = String.format("%d,%s,%d,%d",
                 saturationOutput.batchId,
                 saturationOutput.printId,
                 saturationOutput.tileId,

@@ -35,23 +35,17 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
 
             TileLayerData currentLayer = layers.get(layers.size() - 1);
         
-            // Output vuoto
-            TileLayerData emptyResult = new TileLayerData(
-                currentLayer.batchId,
-                currentLayer.printId,
-                currentLayer.tileId,
-                currentLayer.layerId,
-                currentLayer.temperatureMatrix,
-                currentLayer.saturatedCount,
-                currentLayer.processingStartTime,
-                currentLayer.q1EndTime,
-                currentLayer.q2StartTime,
-                currentLayer.q2EndTime,
-                "()", "", "()", "", "()", "", "()", "", "()", "",
-                Collections.emptyList() // Lista vuota di outlier
+            currentLayer.addOutlierResults(
+                Collections.emptyList(),
+                "()", "",
+                "()", "",
+                "()", "",
+                "()", "",
+                "()", ""
             );
+            
 
-            out.collect(emptyResult);
+            out.collect(currentLayer);
             return;
         }
 
@@ -219,23 +213,14 @@ public class Query2 extends ProcessWindowFunction<TileLayerData, TileLayerData,S
             deviations[i] = String.format("%.2f", point.deviation);
         }
 
-        return new TileLayerData(
-                currentLayer.batchId,
-                currentLayer.printId,
-                currentLayer.tileId,
-                currentLayer.layerId,
-                currentLayer.temperatureMatrix,
-                currentLayer.saturatedCount,
-                currentLayer.processingStartTime,
-                currentLayer.q1EndTime,
-                currentLayer.q2StartTime,
-                currentLayer.q2EndTime,
-                points[0], deviations[0],
-                points[1], deviations[1],
-                points[2], deviations[2],
-                points[3], deviations[3],
-                points[4], deviations[4],
-                allOutliers // Salviamo tutti gli outlier per la Q3
+        currentLayer.addOutlierResults(
+            allOutliers,
+            points[0], deviations[0],
+            points[1], deviations[1],
+            points[2], deviations[2],
+            points[3], deviations[3],
+            points[4], deviations[4]
         );
+        return currentLayer;
     }
 }
