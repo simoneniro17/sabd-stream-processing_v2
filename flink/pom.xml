@@ -35,6 +35,8 @@ under the License.
 		<maven.compiler.source>${target.java.version}</maven.compiler.source>
 		<maven.compiler.target>${target.java.version}</maven.compiler.target>
 		<log4j.version>2.24.1</log4j.version>
+		<kafka-connector.version>4.0.0-2.0</kafka-connector.version>
+		<jackson.version>2.13.4</jackson.version>
 	</properties>
 
 	<repositories>
@@ -66,53 +68,51 @@ under the License.
 			<version>${flink.version}</version>
 			<scope>provided</scope>
 		</dependency>
-
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-connector-files</artifactId>
-			<version>2.0.0</version>
+			<version>${flink.version}</version>
 		</dependency>
 
+		<!-- Flink Metrics -->
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-metrics-dropwizard</artifactId>
-			<version>2.0.0</version>
+			<version>${flink.version}</version>
 		</dependency>
-
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-metrics-prometheus</artifactId>
 			<version>${flink.version}</version>
     	</dependency>		
 
+		<!-- Kafka Connector -->
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-connector-kafka</artifactId>
+			<version>${kafka-connector.version}</version>
+		</dependency>
+
+		<!-- Image Processing -->
 		<dependency>
 			<groupId>com.twelvemonkeys.imageio</groupId>
 			<artifactId>imageio-tiff</artifactId>
 			<version>3.8.1</version>
 		</dependency>
 
-
+		<!-- JSON/MsgPack Processing -->
 		<dependency>
-			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-connector-kafka</artifactId>
-			<version>4.0.0-2.0</version>
+			<groupId>org.msgpack</groupId>
+			<artifactId>jackson-dataformat-msgpack</artifactId>
+			<version>0.9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>${jackson.version}</version>
 		</dependency>
 
-			<dependency>
-				<groupId>org.msgpack</groupId>
-				<artifactId>jackson-dataformat-msgpack</artifactId>
-				<version>0.9.0</version>
-			</dependency>
-
-			<dependency>
-				<groupId>com.fasterxml.jackson.core</groupId>
-				<artifactId>jackson-databind</artifactId>
-				<version>2.13.4</version>
-			</dependency>
-
-
-		<!-- Add logging framework, to produce console output when running in the IDE. -->
-		<!-- These dependencies are excluded from the application JAR by default. -->
+		<!-- Logging Framework -->
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-slf4j-impl</artifactId>
@@ -148,46 +148,44 @@ under the License.
 			</plugin>
 
 			<!-- We use the maven-shade plugin to create a fat jar that contains all necessary dependencies. -->
-			<!-- Change the value of <mainClass>...</mainClass> if your program entry point changes. -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
 				<version>3.1.1</version>
 				<executions>
 					<execution>
-					<phase>package</phase>
-					<goals>
-						<goal>shade</goal>
-					</goals>
-					<configuration>
-						<createDependencyReducedPom>false</createDependencyReducedPom>
-						<filters>
-						<filter>
-							<artifact>*:*</artifact>
-							<excludes>
-							<exclude>META-INF/*.SF</exclude>
-							<exclude>META-INF/*.DSA</exclude>
-							<exclude>META-INF/*.RSA</exclude>
-							</excludes>
-						</filter>
-						</filters>
-						<transformers>
-						<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-						<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-							<!-- Replace this with the main class of your job -->
-							<mainClass>it.flink.StreamingJob</mainClass>
-						</transformer>
-						</transformers>
-					</configuration>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<createDependencyReducedPom>false</createDependencyReducedPom>
+							<filters>
+								<filter>
+									<artifact>*:*</artifact>
+									<excludes>
+										<exclude>META-INF/*.SF</exclude>
+										<exclude>META-INF/*.DSA</exclude>
+										<exclude>META-INF/*.RSA</exclude>
+									</excludes>
+								</filter>
+							</filters>
+							<transformers>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>it.flink.StreamingJob</mainClass>
+								</transformer>
+							</transformers>
+						</configuration>
 					</execution>
 				</executions>
-				</plugin>
+			</plugin>
 
-			   <!-- Plugin usato per  copiare il jar nella cartella jobs -->
-				<plugin>
-    				<groupId>org.apache.maven.plugins</groupId>
-    				<artifactId>maven-antrun-plugin</artifactId>
-    				<version>3.1.0</version>
+			<!-- Plugin per copiare il jar nella cartella jobs -->
+			<plugin>
+    			<groupId>org.apache.maven.plugins</groupId>
+    			<artifactId>maven-antrun-plugin</artifactId>
+    			<version>3.1.0</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -196,9 +194,11 @@ under the License.
 						</goals>
 						<configuration>
 							<target>
-								<copy file="${project.build.directory}/${project.build.finalName}.jar" 
+								<copy
+									file="${project.build.directory}/${project.build.finalName}.jar" 
 									tofile="${project.basedir}/jobs/${project.build.finalName}.jar" 
-									overwrite="true"/>
+									overwrite="true"
+								/>
 								<echo message="JAR copied to jobs folder: ${project.build.finalName}.jar"/>
 							</target>
 						</configuration>
@@ -207,6 +207,5 @@ under the License.
 			</plugin>
 
 		</plugins>
-
 	</build>
 </project>
