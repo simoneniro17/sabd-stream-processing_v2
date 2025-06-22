@@ -11,8 +11,10 @@ import java.util.Map;
 
 /** Schema di deserializzazione per i messaggi da Kafka */
 public class MsgPackDeserializationSchema implements DeserializationSchema<Map<String, Object>> {
-
+    
     private static final ObjectMapper mapper = new ObjectMapper(new MessagePackFactory());
+    private static final TypeInformation<Map<String, Object>> TYPE =
+        TypeInformation.of(new TypeHint<Map<String, Object>>() {});
 
     @Override
     public Map<String, Object> deserialize(byte[] message) throws IOException {
@@ -20,7 +22,6 @@ public class MsgPackDeserializationSchema implements DeserializationSchema<Map<S
             return null; // Gestione del caso in cui il messaggio sia vuoto
         }
         
-        // Utilizziamo l'ObjectMapper per deserializzare il messaggio in una mappa
         return mapper.readValue(message, Map.class);
     }
 
@@ -31,6 +32,6 @@ public class MsgPackDeserializationSchema implements DeserializationSchema<Map<S
 
     @Override
     public TypeInformation<Map<String, Object>> getProducedType() {
-        return TypeInformation.of(new TypeHint<Map<String, Object>>() {});
+        return TYPE;
     }
 }

@@ -1,27 +1,20 @@
 package it.flink.serialization;
 
-import org.apache.flink.api.common.serialization.SerializationSchema;
 import it.flink.model.TileLayerData;
 
-/** Schema di  serializzazione per convertire gli oggetti OutlierOutput in formato CSV per Kafka
+/** Schema di  serializzazione per convertire i risultati di Query 2 in formato CSV per Kafka
  * Header CSV atteso: seq_id, print_id, tile_id, P1, dP1, P2, dP2, P3, dP3, P4, dP4, P5, dP5 */
-public class Query2OutputSerializationSchema implements SerializationSchema<TileLayerData> {
+public class Query2OutputSerializationSchema extends OutputSerializationSchema {
     @Override
-    public byte[] serialize(TileLayerData tileLayer) {
-        if (tileLayer == null) {
-            return new byte[0];
-        }
-        
-        String csv = String.format("%d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
-                tileLayer.batchId,
-                tileLayer.printId,
-                tileLayer.tileId,
-                tileLayer.p1, tileLayer.dp1,
-                tileLayer.p2, tileLayer.dp2,
-                tileLayer.p3, tileLayer.dp3,
-                tileLayer.p4, tileLayer.dp4,
-                tileLayer.p5, tileLayer.dp5);
-
-        return csv.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    protected String formatCsv(TileLayerData tile) {
+        return String.format("%d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+                tile.batchId,
+                tile.printId,
+                tile.tileId,
+                tile.p1, tile.dp1,
+                tile.p2, tile.dp2,
+                tile.p3, tile.dp3,
+                tile.p4, tile.dp4,
+                tile.p5, tile.dp5);
     }
 }

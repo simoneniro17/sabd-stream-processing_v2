@@ -2,7 +2,6 @@ package it.flink.utils;
 
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 
@@ -29,8 +28,8 @@ public class KafkaTopicUtils {
                 } catch (Exception e) {
                     System.out.println("[WARN] Errore durante il controllo del topic '" + topicName + "':" + e.getMessage());
                     Thread.sleep(delayMillis);
+                }
             }
         }
     }
 }
-
