@@ -30,18 +30,21 @@ import java.util.Map;
  */
 public class StreamingJob {
     private static final boolean ENABLE_PROFILING = true;       // TRUE per abilitare metriche personalizzate
+    
     private static final String KAFKA_BOOTSTRAP_SERVER = "kafka:9092";
     private static final String INPUT_TOPIC = "gc-batches";
     private static final String SATURATION_OUTPUT_TOPIC = "query1-results";
     private static final String OUTLIER_OUTPUT_TOPIC = "query2-results";
     private static final String CLUSTER_OUTPUT_TOPIC = "query3-results";
+    
+    private static final int PARALLELISM = 1;   // Parallelismo per le operazioni di Flink
 
     public static void main(String[] args) throws Exception {
         // Set up dell'ambiente di esecuzione di Flink con configurazione per Prometheus (per le metriche personalizzate)
         Configuration config = new Configuration();
         config.setString("metrics.reporter.prom.factory.class", "org.apache.flink.metrics.prometheus.PrometheusReporterFactory");
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
-        env.setParallelism(1);
+        env.setParallelism(PARALLELISM);
 
         // Attesa che Kafka sia pronto e che il topic di input esista
         KafkaWait.waitForBroker("kafka", 9092, 1000);

@@ -22,7 +22,8 @@ public class MsgPackDeserializationSchema implements DeserializationSchema<Map<S
             return null; // Gestione del caso in cui il messaggio sia vuoto
         }
         
-        return mapper.readValue(message, Map.class);
+         return mapper.readValue(message, 
+           new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
     }
 
     @Override
