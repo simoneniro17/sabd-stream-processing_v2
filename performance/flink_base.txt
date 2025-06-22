@@ -1,1 +1,10 @@
-Benchmark 01JY9NRX6TNMPK56VMRTFH6TK8 terminato. Risposta: {"0":{"count":160,"missing":0,"throughput":15.175665371983357,"latency_mean":"5s914ms67µs586ns","latency_min":"1s482ms851µs946ns","latency_max":"10s392ms368µs618ns","latency_p99":"10s392ms368µs618ns"}}
+{"count":160,"missing":0,"throughput":15.175665371983357,"latency_mean":"5s914ms67µs586ns","latency_min":"1s482ms851µs946ns","latency_max":"10s392ms368µs618ns","latency_p99":"10s392ms368µs618ns"}
+{"count":160,"missing":0,"throughput":13.499767597493065,"latency_mean":"7s55ms774µs642ns","latency_min":"1s519ms253µs822ns","latency_max":"11s708ms848µs373ns","latency_p99":"11s708ms848µs373ns"}
+{"count":160,"missing":0,"throughput":18.342759672943572,"latency_mean":"4s108ms338µs10ns","latency_min":"85ms655µs156ns","latency_max":"8s401ms322µs784ns","latency_p99":"8s401ms322µs784ns"}
+{"count":160,"missing":0,"throughput":17.753570606719812,"latency_mean":"4s89ms283µs709ns","latency_min":"85ms397µs205ns","latency_max":"8s527ms395µs205ns","latency_p99":"8s527ms395µs205ns"}
+{"count":160,"missing":0,"throughput":13.151697465561263,"latency_mean":"6s352ms577µs541ns","latency_min":"1s760ms852µs981ns","latency_max":"12s29ms708µs290ns","latency_p99":"12s29ms708µs290ns"}
+{"count":160,"missing":0,"throughput":15.190815715076932,"latency_mean":"6s51ms394µs194ns","latency_min":"1s844ms42µs499ns","latency_max":"10s389ms748µs335ns","latency_p99":"10s389ms748µs335ns"}
+{"count":160,"missing":0,"throughput":17.992899836639605,"latency_mean":"4s28ms117µs842ns","latency_min":"83ms109µs967ns","latency_max":"8s453ms563µs381ns","latency_p99":"8s453ms563µs381ns"}
+{"count":160,"missing":0,"throughput":17.500742785119822,"latency_mean":"4s303µs489ns","latency_min":"99ms143µs977ns","latency_max":"8s533ms256µs507ns","latency_p99":"8s533ms256µs507ns"}
+{"count":160,"missing":0,"throughput":17.446038880813827,"latency_mean":"3s897ms712µs787ns","latency_min":"116ms184µs935ns","latency_max":"8s407ms495µs658ns","latency_p99":"8s407ms495µs658ns"}
+{"count":160,"missing":0,"throughput":16.501681177148765,"latency_mean":"3s671ms241µs482ns","latency_min":"81ms691µs873ns","latency_max":"8s446ms62µs743ns","latency_p99":"8s446ms62µs743ns"}

@@ -37,7 +37,7 @@ public class StreamingJob {
     private static final String OUTLIER_OUTPUT_TOPIC = "query2-results";
     private static final String CLUSTER_OUTPUT_TOPIC = "query3-results";
     
-    private static final int PARALLELISM = 1;   // Parallelismo per le operazioni di Flink
+    private static final int PARALLELISM = 4;   // Parallelismo per le operazioni di Flink
 
     public static void main(String[] args) throws Exception {
         // Set up dell'ambiente di esecuzione di Flink con configurazione per Prometheus (per le metriche personalizzate)
