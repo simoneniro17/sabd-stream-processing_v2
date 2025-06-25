@@ -1,10 +1,16 @@
 package it.kafkastreams;
 
+import java.util.Deque;
 import java.util.Map;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.processor.api.FixedKeyProcessorSupplier;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.StoreBuilder;
+import org.apache.kafka.streams.state.Stores;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import it.kafkastreams.model.TileLayerData;
 import it.kafkastreams.processing.Query1;
@@ -12,8 +18,11 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import java.util.Properties;
 import it.kafkastreams.serialization.MsgPackKafkaSerde;
 import it.kafkastreams.serialization.Query1CsvSerializer;
+import it.kafkastreams.utils.SlidingWindowProcessor;
 import it.kafkastreams.utils.TileLayerExtractor;
+import it.kafkastreams.serialization.DequeSerde;
 import it.kafkastreams.serialization.Query1CsvSerializer;
+import java.util.Deque;
 
 
 public class StreamingJob { public static void main(String[] args) {
@@ -57,6 +66,22 @@ public class StreamingJob { public static void main(String[] args) {
         streams.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
-    }
+
+        StoreBuilder<KeyValueStore<String, Deque<TileLayerData>>> storeBuilder =
+            Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore("window-store"),
+                Serdes.String(),
+                new DequeSerde<>(TileLayerData.class)
+            );
+        builder.addStateStore(storeBuilder);
+
+KStream<String, TileLayerData> processed = analyzed.processValues(
+    () -> new SlidingWindowProcessor(),  // <-- fornisce l'istanza
+    Named.as("query2-processor"),
+    "window-store"
+);
+
+
+}
 }
 
