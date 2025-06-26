@@ -18,13 +18,6 @@ public class TileLayerData {
     public String p1, dp1, p2, dp2, p3, dp3, p4, dp4, p5, dp5;
     public List<OutlierPoint> outlierPoints;
 
-
-    // Timestamp per monitoraggio prestazioni
-    public long processingStartTime = 0L; 
-    public long q1EndTime = 0L;
-    public long q2StartTime = 0L;
-    public long q2EndTime = 0L;
-
     /** Costruttre base per i dati iniziali di un tile */
     public TileLayerData(int batchId, String printId, int tileId, int layerId, int[][] temperatureMatrix) {
         this.batchId = batchId;
@@ -38,8 +31,8 @@ public class TileLayerData {
     /** Aggiunge i risultati di Q1 */
     public void addSaturationResults(int saturatedCount) {
         this.saturatedCount = saturatedCount;
-        this.q1EndTime = System.currentTimeMillis();
     }
+
     /** Costruttore vuoto richiesto da Jackson per la deserializzazione */
     public TileLayerData() {
         this.batchId = 0;
@@ -63,7 +56,6 @@ public class TileLayerData {
         this.p3 = p3; this.dp3 = dp3;
         this.p4 = p4; this.dp4 = dp4;
         this.p5 = p5; this.dp5 = dp5;
-        this.q2EndTime = System.currentTimeMillis();
     }
 
   
@@ -86,21 +78,6 @@ public class TileLayerData {
             if (p4 != null) sb.append(", " + p4 + ":" + dp4);
             if (p5 != null) sb.append(", " + p5 + ":" + dp5);
             sb.append("]");
-        }
-        
-       
-        
-        // Info sui tempi di elaborazione se disponibili
-        if (processingStartTime > 0) {
-            if (q1EndTime > 0) {
-                sb.append(", q1Time=" + (q1EndTime - processingStartTime) + "ms");
-            }
-            if (q2StartTime > 0 && q2EndTime > 0) {
-                sb.append(", q2Time=" + (q2EndTime - q2StartTime) + "ms");
-            }
-            if (q1EndTime > 0 && q2EndTime > 0) {
-                sb.append(", totalTime=" + (q2EndTime - processingStartTime) + "ms");
-            }
         }
         
         sb.append("}");

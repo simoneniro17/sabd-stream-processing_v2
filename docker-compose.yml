@@ -41,13 +41,12 @@ services:
       context: ./kafkastreams
       dockerfile: Dockerfile
     container_name: kafka-streams
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       - kafka
     networks:
       - sabd-stream-processing-network
-
-    environment:
-      BOOTSTRAP_SERVERS: kafka:9092
 
   producer:
     build:

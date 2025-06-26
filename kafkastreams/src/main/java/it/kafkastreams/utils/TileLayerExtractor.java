@@ -1,16 +1,15 @@
 package it.kafkastreams.utils;
 
-
 import it.kafkastreams.model.TileLayerData;
 
 import javax.imageio.ImageIO;
-
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 import java.util.Map;
+
 
 
 /**
@@ -43,24 +42,30 @@ public class TileLayerExtractor{
         return value;
     }
 
+    
     /** Estre i dati TIFF dal formato ricevuto */
     private byte[] extractTiffData(Object rawTiffData) throws IOException {
         if (rawTiffData instanceof byte[]) {
             return (byte[]) rawTiffData;
-        } else if (rawTiffData instanceof ByteBuffer) {
+        }
+        
+        if (rawTiffData instanceof ByteBuffer) {
             ByteBuffer buf = (ByteBuffer) rawTiffData;
             byte[] bytes = new byte[buf.remaining()];
             buf.get(bytes);
             return bytes;
-        } else if (rawTiffData instanceof String) {
+        }
+        
+        if (rawTiffData instanceof String) {
             try {
                 return Base64.getDecoder().decode((String) rawTiffData);
             } catch (IllegalArgumentException e) {
                 throw new IOException("Errore nella decodifica Base64 dei dati TIFF: " + rawTiffData, e);
             }
-        } else {
-            throw new RuntimeException("Tipo tif non riconosciuto: " + rawTiffData.getClass());
         }
+        
+        throw new RuntimeException("Formato dati TIFF non supportato: " + 
+                                   (rawTiffData != null ? rawTiffData.getClass().getName() : "null"));
     }
 
     /** Decodifica l'immagine TIFF */
@@ -71,16 +76,14 @@ public class TileLayerExtractor{
                 throw new IOException("Immagine TIFF non valida o non supportata.");
             }
             return img;
-        } catch (IOException e) {
-            throw new IOException("Errore durante la decodifica dell'immagine TIFF.", e);
         }
     }
 
     /** Crea una matrice di temperatura per l'immagine passata come input */
     private int[][] createTemperatureMatrix(BufferedImage img) {
-        // Dimensioni dell'immagine
         int width = img.getWidth();
         int height = img.getHeight();
+        int[][] temperatureMatrix = new int[height][width];
 
         // Assumiamo che l'immagine sia in scala di grigi e creiamo una matrice di temperature
         // La matrice è organizzata come [y][x], dove y è la riga e x è la colonna
@@ -91,7 +94,6 @@ public class TileLayerExtractor{
 
         // per questo la matrice la creiamo di dimensione [height][width], perché height è l'altezza dell'immagine
         // (che corrisponde al numero di righe) e width è la larghezza dell'immagine (che corrisponde al numero di colonne)
-        int[][] temperatureMatrix = new int[height][width];
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {

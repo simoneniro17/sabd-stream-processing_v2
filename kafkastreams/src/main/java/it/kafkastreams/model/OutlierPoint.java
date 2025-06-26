@@ -1,8 +1,7 @@
 package it.kafkastreams.model;
 
-/** Rappresenta un singolo punto outlier (i.e. con deviazione di temperatura locale
- * maggiore di 6000) con le sue coordinate (x, y) e la deviazione calcolata.
- * TODO:Le coordinate sono relative alla matrice o alla immagine??
+/** Rappresenta un singolo punto classificato come outlier
+ * (i.e. con deviazione di temperatura locale > 6000).
 */
 public class OutlierPoint {
     public final int x;

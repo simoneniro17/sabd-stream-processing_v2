@@ -3,14 +3,15 @@ package it.kafkastreams.serialization;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
+
 import java.util.Map;
 
 /**
- * Serde custom per Kafka Streams che permette di deserializzare i messaggi MessagePack in Map<String, Object>.
- * La serializzazione non è implementata (restituisce sempre null) perché in questo caso serve solo la deserializzazione.
+ * Serde personalizzato per la deserializzazione di messaggi MessagePack in Map<String, Object>.
+ * La serializzazione non è implementata poiché in questo contesto è necessaria solo la deserializzazione.
  */
-
 public class MsgPackKafkaSerde implements Serde<Map<String, Object>> {
+    
     private final MsgPackKafkaDeserializer deserializer = new MsgPackKafkaDeserializer();
 
     @Override
