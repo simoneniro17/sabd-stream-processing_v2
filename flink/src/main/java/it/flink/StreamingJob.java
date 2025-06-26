@@ -87,10 +87,12 @@ public class StreamingJob {
 
         if (ENABLE_PROFILING) {
             resultStream = stream
+                .keyBy(tile -> tile.printId + "_" + tile.tileId) // aggiunta per ottimizzazione
                 .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class)
                 .map(new QueryMetrics("query1", MetricType.QUERY1, true));
         } else {
             resultStream = stream
+                .keyBy(tile -> tile.printId + "_" + tile.tileId) // aggiunta per ottimizzazione
                 .map(tile -> Query1.analyzeSaturation(tile)).returns(TileLayerData.class); 
         }
 
