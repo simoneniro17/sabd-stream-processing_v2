@@ -4,6 +4,7 @@ import java.util.Deque;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.kstream.*;
@@ -15,6 +16,8 @@ import it.kafkastreams.model.TileLayerData;
 import it.kafkastreams.processing.Query1;
 import it.kafkastreams.serialization.DequeSerde;
 import it.kafkastreams.serialization.MsgPackKafkaSerde;
+import it.kafkastreams.utils.KafkaTopicUtils;
+import it.kafkastreams.utils.KafkaWait;
 import it.kafkastreams.utils.SlidingWindowProcessor;
 import it.kafkastreams.utils.TileLayerExtractor;
 
@@ -26,11 +29,15 @@ public class StreamingJob {
     
     // Configurazione dei topic Kafka
     private static final String INPUT_TOPIC = "gc-batches";
+    private static final String KAFKA_BOOTSTRAP_SERVER = "kafka:9092";
     private static final String QUERY1_OUTPUT_TOPIC = "query1-results";
     private static final String QUERY2_OUTPUT_TOPIC = "query2-results";
     private static final String WINDOW_STORE_NAME = "window-store";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
+        KafkaWait.waitForBroker("kafka", 9092, 1000);
+        KafkaTopicUtils.waitForTopic(KAFKA_BOOTSTRAP_SERVER, INPUT_TOPIC, 1000);
+
         // Configurazione di base di Kafka Streams
         Properties props = getKafkaProperties();
         
@@ -60,11 +67,12 @@ public class StreamingJob {
     
     private static Properties getKafkaProperties() {
         Properties props = new Properties();
-        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "streaming-job");
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, "kafka-job-" + System.currentTimeMillis());
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka:9092");
-        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
 
-        // Configurazione per MsgPack serialization/deserialization
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, MsgPackKafkaSerde.class);
 
         // Parametri di ottimizzazione per gestire le finestre
@@ -122,8 +130,8 @@ public class StreamingJob {
         // Serializza i risultati in CSV
         KStream<String, String> csvResults = processed.mapValues(tile ->
             String.format(
-                "%d,%s,%d,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
-                tile.batchId, tile.printId, tile.tileId, tile.layerId,
+                "%d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+                tile.batchId, tile.printId, tile.tileId,
                 tile.p1, tile.dp1,
                 tile.p2, tile.dp2,
                 tile.p3, tile.dp3,

@@ -52,10 +52,10 @@ public class SlidingWindowProcessor implements FixedKeyProcessor<String, TileLay
         // Memorizza la finestra aggiornata
         store.put(key, window);
 
-        // Se la finestra ha raggiunto la dimensione completa, esegui l'analisi
-        if (window.size() == WINDOW_SIZE) {
-            // Crea una copia della finestra per l'analisi
-            TileLayerData output = Query2.analyzeWindow(new LinkedList<>(window));
+        // Crea una copia della finestra per l'analisi
+        TileLayerData output = Query2.analyzeWindow(new LinkedList<>(window));
+
+        if (output != null) {
             context.forward(record.withValue(output));
         }
     }

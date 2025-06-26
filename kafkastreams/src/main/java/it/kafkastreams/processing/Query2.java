@@ -25,12 +25,24 @@ public class Query2 {
     private static final int TOP_OUTLIERS_COUNT = 5;
 
     public static TileLayerData analyzeWindow(Deque<TileLayerData> window) {
-        if (window == null || window.size() < WINDOW_SIZE) {
-            return null;
+        // Raccogliamo i layer nella finestra
+        List<TileLayerData> layers = collectLayers(window);
+
+        if (layers.size() < WINDOW_SIZE) {
+            TileLayerData currentLayer = layers.get(layers.size() - 1);
+
+            currentLayer.addOutlierResults(
+                "()", "",
+                "()", "",
+                "()", "",
+                "()", "",
+                "()", ""
+            );
+
+            return currentLayer;
         }
 
-        // Raccogliamo e ordiniamo i layer per ID
-        List<TileLayerData> layers = new ArrayList<>(window);
+        
         layers.sort(Comparator.comparingInt(t -> t.layerId));
 
         // Prendiamo il layer più recente (il terzo della lista)
@@ -40,6 +52,15 @@ public class Query2 {
         List<OutlierPoint> outliers = findOutliers(layers);
 
         return createOutput(currentLayer, outliers);
+    }
+
+    private static List<TileLayerData> collectLayers(Deque<TileLayerData> window) {
+        List<TileLayerData> layers = new ArrayList<>(window);
+
+        // Ordiniamo i layer in base all'id che hanno 
+        layers.sort(Comparator.comparingInt(t -> t.layerId));
+
+        return layers;
     }
 
     /** Individua gli outlier analizzando la dev di temperatura */
@@ -175,7 +196,6 @@ public class Query2 {
         }
 
         currentLayer.addOutlierResults(
-            allOutliers,
             points[0], deviations[0],
             points[1], deviations[1],
             points[2], deviations[2],

@@ -1,8 +1,5 @@
 package it.kafkastreams.model;
 
-import java.util.Collections;
-import java.util.List;
-
 /** Rappresenta i dati di un singolo tile all'interno di un layer */
 public class TileLayerData {
     public final int batchId;
@@ -16,7 +13,6 @@ public class TileLayerData {
 
     // Risultati Q2 - Top 5 outlier e lista outlier
     public String p1, dp1, p2, dp2, p3, dp3, p4, dp4, p5, dp5;
-    public List<OutlierPoint> outlierPoints;
 
     /** Costruttre base per i dati iniziali di un tile */
     public TileLayerData(int batchId, String printId, int tileId, int layerId, int[][] temperatureMatrix) {
@@ -25,7 +21,6 @@ public class TileLayerData {
         this.tileId = tileId;
         this.layerId = layerId;
         this.temperatureMatrix = temperatureMatrix;
-        this.outlierPoints = Collections.emptyList();
     }
 
     /** Aggiunge i risultati di Q1 */
@@ -40,17 +35,14 @@ public class TileLayerData {
         this.tileId = 0;
         this.layerId = 0;
         this.temperatureMatrix = null;
-        this.outlierPoints = Collections.emptyList();
     }
 
     /** Aggiunge i risultati di Q2 */
     public void addOutlierResults(
-        List<OutlierPoint> allOutliers,
         String p1, String dp1, String p2, String dp2,
         String p3, String dp3, String p4, String dp4,
         String p5, String dp5) {
 
-        this.outlierPoints = allOutliers;
         this.p1 = p1; this.dp1 = dp1;
         this.p2 = p2; this.dp2 = dp2;
         this.p3 = p3; this.dp3 = dp3;
@@ -69,16 +61,14 @@ public class TileLayerData {
         sb.append("saturatedCount=" + saturatedCount);
         
         // Info sugli outlier da Q2 se presenti
-        if (outlierPoints != null && !outlierPoints.isEmpty()) {
-            sb.append(", outliers=" + outlierPoints.size());
-            sb.append(", topOutliers=[");
-            if (p1 != null) sb.append(p1 + ":" + dp1);
-            if (p2 != null) sb.append(", " + p2 + ":" + dp2);
-            if (p3 != null) sb.append(", " + p3 + ":" + dp3);
-            if (p4 != null) sb.append(", " + p4 + ":" + dp4);
-            if (p5 != null) sb.append(", " + p5 + ":" + dp5);
-            sb.append("]");
-        }
+        sb.append(", topOutliers=[");
+        if (p1 != null) sb.append(p1 + ":" + dp1);
+        if (p2 != null) sb.append(", " + p2 + ":" + dp2);
+        if (p3 != null) sb.append(", " + p3 + ":" + dp3);
+        if (p4 != null) sb.append(", " + p4 + ":" + dp4);
+        if (p5 != null) sb.append(", " + p5 + ":" + dp5);
+        sb.append("]");
+        
         
         sb.append("}");
         return sb.toString();

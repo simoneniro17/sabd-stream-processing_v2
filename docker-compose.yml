@@ -41,10 +41,13 @@ services:
       context: ./kafkastreams
       dockerfile: Dockerfile
     container_name: kafka-streams
-    environment:
-      BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       - kafka
+    volumes:
+      - ./kafkastreams/target/kafkastreams-1.0-SNAPSHOT-jar-with-dependencies.jar:/app/jobs/app.jar
+    command: ["java", "-jar", "/app/jobs/app.jar"]  
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - sabd-stream-processing-network
 
