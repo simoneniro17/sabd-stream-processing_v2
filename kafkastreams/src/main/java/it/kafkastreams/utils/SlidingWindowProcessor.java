@@ -11,6 +11,11 @@ import java.util.LinkedList;
 import it.kafkastreams.model.TileLayerData;
 import it.kafkastreams.processing.Query2;
 
+/**
+ * Processor custom per Kafka Streams che implementa una sliding window a conteggio (size 3, slide 1)
+ * per ogni chiave logica ( printId_tileId). Mantiene la finestra nello state store e,
+ * ogni volta che la finestra è piena, applica la logica di Query2 e inoltra il risultato.
+ */
 public class SlidingWindowProcessor implements FixedKeyProcessor<String, TileLayerData, TileLayerData> {
 
     private KeyValueStore<String, Deque<TileLayerData>> store;

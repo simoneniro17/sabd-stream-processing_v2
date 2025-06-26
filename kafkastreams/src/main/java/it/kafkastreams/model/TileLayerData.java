@@ -40,6 +40,15 @@ public class TileLayerData {
         this.saturatedCount = saturatedCount;
         this.q1EndTime = System.currentTimeMillis();
     }
+    /** Costruttore vuoto richiesto da Jackson per la deserializzazione */
+    public TileLayerData() {
+        this.batchId = 0;
+        this.printId = "";
+        this.tileId = 0;
+        this.layerId = 0;
+        this.temperatureMatrix = null;
+        this.outlierPoints = Collections.emptyList();
+    }
 
     /** Aggiunge i risultati di Q2 */
     public void addOutlierResults(
