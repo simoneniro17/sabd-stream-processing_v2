@@ -48,7 +48,7 @@ def start_services(use_kafka_streams=False) -> bool:
     
     # 1. Avvia servizi di base: kafka, gc-challenger, prometheus e grafana
     print("1. Avvio dei servizi base: Kafka, LOCAL-CHALLENGER, Prometheus e Grafana...")
-    success = run_command(["docker", "compose", "up", "-d", "kafka", "gc-challenger", "prometheus", "grafana"])
+    success = run_command(["docker", "compose", "up", "-d", "kafka", "gc-challenger", "grafana", "prometheus"])
     if not success:
         print("Errore nell'avviare i servizi base")
         return False
@@ -174,10 +174,6 @@ def main():
 
     if args.all or args.start:
         start_services(use_kafka_streams)
-        
-    # Il deploy è necessario solo per Flink, non per Kafka Streams
-    if not use_kafka_streams and (args.all or args.deploy):
-        submit_flink_job()
 
     if args.all or args.read:
         read_kafka_topics(use_kafka_streams, args.topic)

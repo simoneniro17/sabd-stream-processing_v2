@@ -1,0 +1,10 @@
+{"count":160,"missing":0,"throughput":14.201059688204065,"latency_mean":"5s366ms272µs844ns","latency_min":"164ms733µs763ns","latency_max":"11s4ms354µs927ns","latency_p99":"11s4ms354µs927ns"}
+{"count":160,"missing":0,"throughput":14.206207594707285,"latency_mean":"5s291ms119µs478ns","latency_min":"211ms527µs689ns","latency_max":"10s871ms892µs687ns","latency_p99":"10s871ms892µs687ns"}
+{"count":160,"missing":0,"throughput":18.476929042729054,"latency_mean":"4s182ms302µs694ns","latency_min":"188ms983µs720ns","latency_max":"8s394ms876µs144ns","latency_p99":"8s394ms876µs144ns"}
+{"count":160,"missing":0,"throughput":14.139936384518116,"latency_mean":"5s935ms368µs797ns","latency_min":"204ms454µs971ns","latency_max":"10s890ms617µs247ns","latency_p99":"10s890ms617µs247ns"}
+{"count":160,"missing":0,"throughput":18.26898141245608,"latency_mean":"4s111ms714µs353ns","latency_min":"151ms709µs284ns","latency_max":"8s411ms261µs331ns","latency_p99":"8s411ms261µs331ns"}
+{"count":160,"missing":0,"throughput":12.269170994434294,"latency_mean":"8s665ms325µs681ns","latency_min":"4s520ms164µs808ns","latency_max":"12s898ms609µs60ns","latency_p99":"12s898ms609µs60ns"}
+{"count":160,"missing":0,"throughput":15.232640316441165,"latency_mean":"6s135ms857µs430ns","latency_min":"1s999ms752µs503ns","latency_max":"10s364ms2µs62ns","latency_p99":"10s364ms2µs62ns"}
+{"count":160,"missing":0,"throughput":13.994276677925868,"latency_mean":"5s550ms587µs902ns","latency_min":"211ms183µs184ns","latency_max":"11s20ms794µs254ns","latency_p99":"11s20ms794µs254ns"}
+{"count":160,"missing":0,"throughput":12.10143690005916,"latency_mean":"8s843ms665µs92ns","latency_min":"4s676ms953µs84ns","latency_max":"13s78ms13µs40ns","latency_p99":"13s78ms13µs40ns"}
+{"count":160,"missing":0,"throughput":18.31298009039633,"latency_mean":"4s295ms70µs859ns","latency_min":"226ms50µs78ns","latency_max":"8s501ms856µs561ns","latency_p99":"8s501ms856µs561ns"}

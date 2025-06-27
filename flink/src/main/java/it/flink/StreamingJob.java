@@ -29,7 +29,7 @@ import java.util.Map;
  * Legge dati da Kafka, esegue le query di analisi e scrive i risultati su Kafka.
  */
 public class StreamingJob {
-    private static final boolean ENABLE_PROFILING = true;       // TRUE per abilitare metriche personalizzate
+    private static final boolean ENABLE_PROFILING = false;       // TRUE per abilitare metriche personalizzate
     
     private static final String KAFKA_BOOTSTRAP_SERVER = "kafka:9092";
     private static final String INPUT_TOPIC = "gc-batches";
@@ -37,7 +37,7 @@ public class StreamingJob {
     private static final String OUTLIER_OUTPUT_TOPIC = "query2-results";
     private static final String CLUSTER_OUTPUT_TOPIC = "query3-results";
     
-    private static final int PARALLELISM = 4;   // Parallelismo per le operazioni di Flink
+    private static final int PARALLELISM = 2;   // Parallelismo per le operazioni di Flink
 
     public static void main(String[] args) throws Exception {
         // Set up dell'ambiente di esecuzione di Flink con configurazione per Prometheus (per le metriche personalizzate)
