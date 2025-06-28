@@ -15,7 +15,7 @@ KAFKA_STREAMS_JAR_NAME = "kafkastreams-1.0-SNAPSHOT-jar-with-dependencies.jar"
 LOCAL_KS_JAR_PATH = os.path.join("kafkastreams", "target", KAFKA_STREAMS_JAR_NAME)
 
 CONSUMER_SCRIPT_SHORT = "/app/consumer_short.py"
-ALL_TOPICS = ["query1-results", "query2-results"]
+ALL_TOPICS = ["query2-results","query1-results"]
 
 BENCH_TOPIC = "gc-bench"
 API_URL = 'http://gc-challenger:8866'
@@ -48,7 +48,7 @@ def start_services(use_kafka_streams=False) -> bool:
     
     # 1. Avvia servizi di base: kafka, gc-challenger, prometheus e grafana
     print("1. Avvio dei servizi base: Kafka, LOCAL-CHALLENGER, Prometheus e Grafana...")
-    success = run_command(["docker", "compose", "up", "-d", "kafka", "gc-challenger", "grafana", "prometheus"])
+    success = run_command(["docker", "compose", "up", "-d", "kafka", "gc-challenger"])
     if not success:
         print("Errore nell'avviare i servizi base")
         return False
