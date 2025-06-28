@@ -10,7 +10,7 @@ services:
     networks:
       - sabd-stream-processing-network
 
-
+  ### BROKER KAFKA ###
   zookeeper:
     image: confluentinc/cp-zookeeper:7.2.1
     container_name: zookeeper
@@ -36,21 +36,7 @@ services:
     networks:
       - sabd-stream-processing-network
 
-  kafka-streams:
-    build:
-      context: ./kafkastreams
-      dockerfile: Dockerfile
-    container_name: kafka-streams
-    depends_on:
-      - kafka
-    volumes:
-      - ./kafkastreams/target/kafkastreams-1.0-SNAPSHOT-jar-with-dependencies.jar:/app/jobs/app.jar
-    command: ["java", "-jar", "/app/jobs/app.jar"]  
-    environment:
-      BOOTSTRAP_SERVERS: kafka:9092
-    networks:
-      - sabd-stream-processing-network
-
+  ### PRODUCER E CONSUMER ###
   producer:
     build:
       context: .
@@ -63,10 +49,10 @@ services:
       - ./producer/app:/app
     command: ["python", "/app/producer.py", "--limit", "160"]
     #command: ["python", "/app/producer.py"]
-    networks:
-      - sabd-stream-processing-network
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - sabd-stream-processing-network
 
   consumer:
     build:
@@ -79,11 +65,12 @@ services:
       - ./consumer/app:/app
       - ./results:/results
     command: ["tail", "-f", "/dev/null"]
-    networks:
-      - sabd-stream-processing-network
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - sabd-stream-processing-network
 
+  ### CLUSTER FLINK ###
   jobmanager:
     image: flink:2.0
     container_name: jobmanager
@@ -158,6 +145,23 @@ services:
     networks:
       - sabd-stream-processing-network
 
+  ### KAFKA STREAMS ###
+  kafka-streams:
+    build:
+      context: ./kafkastreams
+      dockerfile: Dockerfile
+    container_name: kafka-streams
+    depends_on:
+      - kafka
+    volumes:
+      - ./kafkastreams/target/kafkastreams-1.0-SNAPSHOT-jar-with-dependencies.jar:/app/jobs/app.jar
+    command: ["java", "-jar", "/app/jobs/app.jar"]  
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - sabd-stream-processing-network
+
+  ### MONITORING E VISUALIZATION ###
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -184,7 +188,6 @@ services:
     tty: true
     networks:
       - sabd-stream-processing-network
-
 
 networks:
   sabd-stream-processing-network:
