@@ -185,6 +185,7 @@ class KafkaResultConsumer:
                     if (datetime.now() - last_message_time).total_seconds() > 10:
                         logger.warning("Nessun messaggio ricevuto per 10 secondi, elaborazione completata")
                         all_data_processed = True
+
                 
                 time.sleep(0.01)  # Pausa breve per non sovraccaricare la CPU
                 
@@ -199,6 +200,40 @@ class KafkaResultConsumer:
             # Chiusura benchmark per query3 in modo da ottenere i risultati finali
             if self.query_type == "query3":
                 self._end_benchmark(bench_id)
+                self._convert_JSONL_to_CSV()
+
+    def _convert_JSONL_to_CSV(self):
+        # Generiamo il path del file CSV associato
+        csv_file = self.jsonl_file.replace(".jsonl", ".csv")
+
+        # Se il file non esiste ancora, scriviamo l'header
+        write_header = not os.path.exists(csv_file)
+
+        with open(self.jsonl_file, "r", encoding="utf-8") as jfile, \
+            open(csv_file, "a", newline='', encoding="utf-8") as cfile:
+
+            writer = csv.DictWriter(cfile, fieldnames=[
+                "batch_id", "print_id", "tile_id", "saturated", "x", "y", "count"
+            ])
+
+            if write_header:
+                writer.writeheader()
+
+            for line in jfile:
+                try:
+                    record = json.loads(line)
+                    for centroid in record.get("centroids", []):
+                        writer.writerow({
+                            "batch_id": record["batch_id"],
+                            "print_id": record["print_id"],
+                            "tile_id": record["tile_id"],
+                            "saturated": record["saturated"],
+                            "x": centroid["x"],
+                            "y": centroid["y"],
+                            "count": centroid["count"]
+                        })
+                except Exception as e:
+                    logger.error(f"Errore nella conversione JSON→CSV: {e}")
     
     def _process_query3_message(self, row, batch_id, bench_id):
         """Processa un messaggio della query3, lo salva in JSONL e lo invia all'API."""
@@ -236,8 +271,8 @@ class KafkaResultConsumer:
 
             # Salvataggio nel file JSONL
             with open(self.jsonl_file, "a", encoding="utf-8") as jsonfile:
-                json.dump(json_record, jsonfile)
-                jsonfile.write("\n")
+                 json.dump(json_record, jsonfile)
+                 jsonfile.write("\n")
 
             binary_data = json.dumps(json_record).encode('utf-8') # decommentare se vogliamo usare il binario
 
