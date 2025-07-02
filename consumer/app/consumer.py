@@ -202,8 +202,10 @@ class KafkaResultConsumer:
                 self._end_benchmark(bench_id)
                 self._convert_JSONL_to_CSV()
 
+
     def _convert_JSONL_to_CSV(self):
-        # Generiamo il path del file CSV associato
+        """Converte il JSONL in CSV per la query3."""
+        # Genera il path del file CSV associato
         csv_file = self.jsonl_file.replace(".jsonl", ".csv")
 
         # Se il file non esiste ancora, scriviamo l'header
@@ -213,7 +215,7 @@ class KafkaResultConsumer:
             open(csv_file, "a", newline='', encoding="utf-8") as cfile:
 
             writer = csv.DictWriter(cfile, fieldnames=[
-                "batch_id", "print_id", "tile_id", "saturated", "x", "y", "count"
+                "batch_id", "print_id", "tile_id", "saturated", "centroids"
             ])
 
             if write_header:
@@ -222,18 +224,15 @@ class KafkaResultConsumer:
             for line in jfile:
                 try:
                     record = json.loads(line)
-                    for centroid in record.get("centroids", []):
-                        writer.writerow({
-                            "batch_id": record["batch_id"],
-                            "print_id": record["print_id"],
-                            "tile_id": record["tile_id"],
-                            "saturated": record["saturated"],
-                            "x": centroid["x"],
-                            "y": centroid["y"],
-                            "count": centroid["count"]
-                        })
+                    writer.writerow({
+                        "batch_id": record["batch_id"],
+                        "print_id": record["print_id"],
+                        "tile_id": record["tile_id"],
+                        "saturated": record["saturated"],
+                        "centroids": json.dumps(record["centroids"])
+                    })
                 except Exception as e:
-                    logger.error(f"Errore nella conversione JSON→CSV: {e}")
+                    logger.error(f"Errore nella conversione JSON to CSV: {e}")
     
     def _process_query3_message(self, row, batch_id, bench_id):
         """Processa un messaggio della query3, lo salva in JSONL e lo invia all'API."""
